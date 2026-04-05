@@ -55,6 +55,7 @@
         "docs/team-standards/review.md",
         "docs/team-standards/calibration.md",
         "docs/team-standards/har-rule-coverage.json",
+        "docs/team-standards/har-rule-examples.json",
         "docs/strategy/team-standards-contract.json",
         "scripts/standards-encoding-check.mjs",
         "docs/architecture/decision-records/0008-team-standards-encoding-gate.md"

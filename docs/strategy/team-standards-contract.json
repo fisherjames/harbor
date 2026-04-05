@@ -7,7 +7,8 @@
     "docs/team-standards/security.md",
     "docs/team-standards/review.md",
     "docs/team-standards/calibration.md",
-    "docs/team-standards/har-rule-coverage.json"
+    "docs/team-standards/har-rule-coverage.json",
+    "docs/team-standards/har-rule-examples.json"
   ],
   "forbiddenPatterns": [
     "~/.cursor",
@@ -52,6 +53,7 @@
       "`review.md`",
       "`calibration.md`",
       "`har-rule-coverage.json`",
+      "`har-rule-examples.json`",
       "pnpm standards:check"
     ]
   },
@@ -65,7 +67,9 @@
       "## History"
     ],
     "historyEntryPattern": "\\d{4}-\\d{2}-\\d{2}:",
-    "historyMinimumEntries": 1
+    "historyMinimumEntries": 1,
+    "warningAfterDays": 31,
+    "failAfterDays": 45
   },
   "harRuleCoverage": {
     "visionContractFile": "docs/strategy/vision-contract.json",
@@ -76,6 +80,23 @@
       "templateTarget",
       "standardFiles",
       "summary"
+    ]
+  },
+  "harExamples": {
+    "file": "docs/team-standards/har-rule-examples.json",
+    "requiredEntryKeys": [
+      "ruleId",
+      "examples"
+    ],
+    "requiredExampleKeys": [
+      "path",
+      "kind",
+      "summary"
+    ],
+    "allowedKinds": [
+      "test",
+      "doc",
+      "code"
     ]
   }
 }

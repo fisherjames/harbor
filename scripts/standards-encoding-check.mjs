@@ -25,6 +25,15 @@ function lineCount(text) {
   return text.split(/\r?\n/).length;
 }
 
+function parseIsoDate(input) {
+  const value = `${input}T00:00:00.000Z`;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
 const failures = [];
 const warnings = [];
 
@@ -161,6 +170,38 @@ if (typeof calibrationPath === "string" && fileExists(calibrationPath)) {
     } else {
       pass(`Calibration history includes ${matches.length} dated entries`);
     }
+
+    const dateRegex = /(\d{4}-\d{2}-\d{2}):/g;
+    const historyDates = [];
+    for (const match of calibrationText.matchAll(dateRegex)) {
+      const parsed = parseIsoDate(match[1]);
+      if (parsed) {
+        historyDates.push(parsed);
+      }
+    }
+
+    if (historyDates.length > 0) {
+      historyDates.sort((a, b) => b.getTime() - a.getTime());
+      const latest = historyDates[0];
+      const ageMs = Date.now() - latest.getTime();
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      const warningAfterDays = Number(calibrationConfig.warningAfterDays ?? 31);
+      const failAfterDays = Number(calibrationConfig.failAfterDays ?? 45);
+
+      if (ageDays > failAfterDays) {
+        fail(
+          `Standards drift: calibration history is stale (${ageDays} days > failAfterDays=${failAfterDays}). Add a new history entry.`
+        );
+      } else if (ageDays > warningAfterDays) {
+        warn(
+          `Calibration freshness warning: latest calibration entry is ${ageDays} days old (warningAfterDays=${warningAfterDays}).`
+        );
+      } else {
+        pass(`Calibration freshness within threshold (${ageDays} days old)`);
+      }
+    } else {
+      fail("Standards drift: unable to parse dated calibration history entries");
+    }
   }
 }
 
@@ -282,6 +323,102 @@ if (typeof matrixPath === "string" && matrixPath.length > 0) {
       }
     } else {
       fail("Standards drift: harness catalog source file for HAR coverage mapping is missing");
+    }
+  }
+}
+
+const harExamplesConfig = contract.harExamples ?? {};
+const examplesPath = harExamplesConfig.file;
+if (typeof examplesPath === "string" && examplesPath.length > 0) {
+  if (!fileExists(examplesPath)) {
+    fail(`Standards drift: HAR examples pack '${examplesPath}' is missing`);
+  } else {
+    pass(`HAR examples pack exists: ${examplesPath}`);
+    const examplesPack = readJson(examplesPath);
+    const exampleEntries = Array.isArray(examplesPack.rules) ? examplesPack.rules : [];
+    const requiredEntryKeys = new Set(harExamplesConfig.requiredEntryKeys ?? []);
+    const requiredExampleKeys = new Set(harExamplesConfig.requiredExampleKeys ?? []);
+    const allowedKinds = new Set(harExamplesConfig.allowedKinds ?? []);
+
+    const visionRules = fileExists("docs/strategy/vision-contract.json")
+      ? new Set(readJson("docs/strategy/vision-contract.json").requiredHarnessRules ?? [])
+      : new Set();
+    const examplesByRule = new Map();
+
+    for (const [index, entry] of exampleEntries.entries()) {
+      if (!entry || typeof entry !== "object") {
+        fail(`Standards drift: HAR examples entry at index ${index} is not an object`);
+        continue;
+      }
+
+      for (const key of requiredEntryKeys) {
+        if (!(key in entry)) {
+          fail(`Standards drift: HAR examples entry at index ${index} missing '${key}'`);
+        }
+      }
+
+      const ruleId = String(entry.ruleId ?? "");
+      if (!ruleId) {
+        fail(`Standards drift: HAR examples entry at index ${index} has empty ruleId`);
+        continue;
+      }
+
+      if (examplesByRule.has(ruleId)) {
+        fail(`Standards drift: HAR examples pack contains duplicate rule '${ruleId}'`);
+      } else {
+        examplesByRule.set(ruleId, entry);
+      }
+
+      if (visionRules.size > 0 && !visionRules.has(ruleId)) {
+        fail(`Standards drift: HAR examples rule '${ruleId}' is not in vision requiredHarnessRules`);
+      }
+
+      const examples = Array.isArray(entry.examples) ? entry.examples : [];
+      if (examples.length === 0) {
+        fail(`Standards drift: HAR examples rule '${ruleId}' must include at least one example`);
+        continue;
+      }
+
+      for (const [exampleIndex, example] of examples.entries()) {
+        if (!example || typeof example !== "object") {
+          fail(`Standards drift: HAR examples '${ruleId}' entry ${exampleIndex} must be an object`);
+          continue;
+        }
+
+        for (const key of requiredExampleKeys) {
+          if (!(key in example)) {
+            fail(`Standards drift: HAR examples '${ruleId}' entry ${exampleIndex} missing '${key}'`);
+          }
+        }
+
+        const examplePath = String(example.path ?? "");
+        const kind = String(example.kind ?? "");
+        if (!examplePath || !fileExists(examplePath)) {
+          fail(`Standards drift: HAR examples '${ruleId}' references missing path '${examplePath}'`);
+          continue;
+        }
+
+        if (allowedKinds.size > 0 && !allowedKinds.has(kind)) {
+          fail(
+            `Standards drift: HAR examples '${ruleId}' has unsupported kind '${kind}'. Allowed: ${[...allowedKinds].join(", ")}`
+          );
+        }
+
+        const content = readText(examplePath);
+        if (!content.includes(ruleId)) {
+          fail(`Standards drift: HAR examples path '${examplePath}' does not reference '${ruleId}'`);
+        } else {
+          pass(`HAR examples '${ruleId}' validated against ${examplePath}`);
+        }
+      }
+    }
+
+    for (const requiredRule of visionRules) {
+      if (!examplesByRule.has(requiredRule)) {
+        fail(`Standards drift: HAR examples pack missing required rule '${requiredRule}'`);
+      } else {
+        pass(`HAR examples pack includes required rule ${requiredRule}`);
+      }
     }
   }
 }

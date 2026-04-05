@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "ruleId": "HAR001",
+      "examples": [
+        {
+          "path": "packages/harness/test/linter.test.ts",
+          "kind": "test",
+          "summary": "Blocks deploy path when verifier node is missing."
+        }
+      ]
+    },
+    {
+      "ruleId": "HAR002",
+      "examples": [
+        {
+          "path": "packages/harness/test/linter.test.ts",
+          "kind": "test",
+          "summary": "Blocks unbounded tool permission scope."
+        }
+      ]
+    },
+    {
+      "ruleId": "HAR003",
+      "examples": [
+        {
+          "path": "packages/harness/test/linter.test.ts",
+          "kind": "test",
+          "summary": "Adds warning when node timeout/retry budgets are missing."
+        }
+      ]
+    },
+    {
+      "ruleId": "HAR004",
+      "examples": [
+        {
+          "path": "packages/harness/test/linter.test.ts",
+          "kind": "test",
+          "summary": "Blocks invalid or missing memU policy."
+        }
+      ]
+    },
+    {
+      "ruleId": "HAR005",
+      "examples": [
+        {
+          "path": "packages/harness/test/linter.test.ts",
+          "kind": "test",
+          "summary": "Warns when toolCallPolicy is missing or invalid."
+        }
+      ]
+    }
+  ]
+}

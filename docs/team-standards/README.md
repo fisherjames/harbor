@@ -14,6 +14,7 @@ These files encode Harbor's tacit team standards into executable, versioned arti
 - `security.md`: standards for threat-model-driven checks.
 - `review.md`: standards for structured pull request review.
 - `har-rule-coverage.json`: standards-to-HAR rule coverage matrix and template target mapping.
+- `har-rule-examples.json`: known-good HAR rule examples tied to concrete files/tests.
 
 ## Calibration
 - `calibration.md` tracks lightweight alignment cadence and change criteria.

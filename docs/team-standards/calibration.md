@@ -18,3 +18,4 @@
 
 ## History
 - 2026-04-05: Initial standards baseline added for Phase 2.6.
+- 2026-04-05: Added HAR catalog parity checks, calibration freshness gate thresholds, and examples pack coverage.
