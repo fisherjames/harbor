@@ -151,6 +151,9 @@ describe("runner idempotency and transition keys", () => {
       async resolveIdempotentRun() {
         return null;
       },
+      async resolveStageReplay() {
+        return null;
+      },
       async createRun() {
         return "run_transitions";
       },
@@ -214,6 +217,148 @@ describe("runner idempotency and transition keys", () => {
     expect(result.status).toBe("completed");
     expect(statusKeys).toEqual(["status:running", "status:completed"]);
     expect(stageKeys).toEqual(["stage:plan:1", "stage:execute:2", "stage:verify:3"]);
+  });
+
+  it("short-circuits stage execution when transition replay is available", async () => {
+    let modelCalls = 0;
+    let memuReadCalls = 0;
+    let memuWriteCalls = 0;
+    let appendStageCalls = 0;
+
+    const replayByTransitionKey = new Map([
+      [
+        "stage:plan:1",
+        {
+          stage: "plan" as const,
+          startedAt: "2026-04-05T00:00:00.000Z",
+          completedAt: "2026-04-05T00:00:01.000Z",
+          prompt: "plan replay",
+          output: "replay-plan",
+          attempts: 1,
+          lintFindings: []
+        }
+      ],
+      [
+        "stage:execute:2",
+        {
+          stage: "execute" as const,
+          startedAt: "2026-04-05T00:00:01.000Z",
+          completedAt: "2026-04-05T00:00:02.000Z",
+          prompt: "execute replay",
+          output: "replay-execute",
+          attempts: 1,
+          lintFindings: []
+        }
+      ],
+      [
+        "stage:verify:3",
+        {
+          stage: "verify" as const,
+          startedAt: "2026-04-05T00:00:02.000Z",
+          completedAt: "2026-04-05T00:00:03.000Z",
+          prompt: "verify replay",
+          output: "PASS",
+          attempts: 1,
+          lintFindings: []
+        }
+      ]
+    ]);
+
+    const persistence: RunPersistence = {
+      async resolveIdempotentRun() {
+        return null;
+      },
+      async resolveStageReplay(_runId, transitionKey) {
+        return replayByTransitionKey.get(transitionKey) ?? null;
+      },
+      async createRun() {
+        return "run_stage_replay";
+      },
+      async updateStatus() {
+        return;
+      },
+      async addLintFindings() {
+        return;
+      },
+      async appendStage() {
+        appendStageCalls += 1;
+      },
+      async storeArtifact() {
+        return;
+      }
+    };
+
+    const replayMemu = {
+      async readContext() {
+        memuReadCalls += 1;
+        return {
+          items: [],
+          compressedPrompt: "memory"
+        };
+      },
+      async writeMemory() {
+        memuWriteCalls += 1;
+        return {
+          memoryId: "m1"
+        };
+      },
+      async healthcheck() {
+        return {
+          ok: true,
+          latencyMs: 1
+        };
+      }
+    };
+
+    const model: ModelProvider = {
+      async generate() {
+        modelCalls += 1;
+        return {
+          output: "PASS",
+          latencyMs: 1
+        };
+      }
+    };
+
+    const tracerMessages: string[] = [];
+    const tracer = {
+      stageStart() {
+        return;
+      },
+      stageEnd() {
+        return;
+      },
+      finding(event: { message: string }) {
+        tracerMessages.push(event.message);
+      },
+      error() {
+        return;
+      }
+    };
+
+    const runner = createWorkflowRunner({
+      model,
+      memu: replayMemu,
+      persistence,
+      tracer
+    });
+
+    const result = await runner.runWorkflow(
+      {
+        ...request,
+        idempotencyKey: "idem-stage-replay"
+      },
+      workflow
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.finalOutput?.output).toBe("replay-execute");
+    expect(result.finalOutput?.verification).toBe("PASS");
+    expect(modelCalls).toBe(0);
+    expect(memuReadCalls).toBe(0);
+    expect(memuWriteCalls).toBe(0);
+    expect(appendStageCalls).toBe(0);
+    expect(tracerMessages.filter((message) => message === "Stage replay deduplicated by transition key")).toHaveLength(3);
   });
 
   it("dedupes idempotent runs without final output payload when details are absent", async () => {

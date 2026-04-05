@@ -28,6 +28,7 @@ interface RunRecord {
   artifacts: Record<string, string>;
   statusTransitionKeys: Set<string>;
   stageTransitionKeys: Set<string>;
+  stageTransitionRecords: Map<string, StageExecutionRecord>;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +80,7 @@ export class InMemoryRunPersistence implements RunStore {
       artifacts: {},
       statusTransitionKeys: new Set<string>(),
       stageTransitionKeys: new Set<string>(),
+      stageTransitionRecords: new Map<string, StageExecutionRecord>(),
       createdAt: now,
       updatedAt: now
     });
@@ -125,10 +127,21 @@ export class InMemoryRunPersistence implements RunStore {
 
     if (transitionKey) {
       run.stageTransitionKeys.add(transitionKey);
+      run.stageTransitionRecords.set(transitionKey, record);
     }
 
     run.stages.push(record);
     run.updatedAt = new Date().toISOString();
+  }
+
+  async resolveStageReplay(runId: string, transitionKey: string): Promise<StageExecutionRecord | null> {
+    const run = this.runs.get(runId);
+    if (!run) {
+      return null;
+    }
+
+    const record = run.stageTransitionRecords.get(transitionKey);
+    return record ? structuredClone(record) : null;
   }
 
   async storeArtifact(runId: string, name: string, value: string): Promise<void> {

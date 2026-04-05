@@ -220,6 +220,33 @@ export class PostgresRunPersistence implements RunStore {
     await this.storeArtifact(runId, "__lint-findings", JSON.stringify(findings));
   }
 
+  async resolveStageReplay(runId: string, transitionKey: string): Promise<StageExecutionRecord | null> {
+    const stageId = stageIdFromTransitionKey(runId, transitionKey);
+    const result = await this.db.query<StageRow>(
+      `SELECT stage, prompt, output, attempts, token_usage, started_at, completed_at
+       FROM execution_stages
+       WHERE id = $1 AND execution_id = $2`,
+      [stageId, runId]
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    const tokenUsage = parseTokenUsage(row.token_usage);
+    return {
+      stage: row.stage,
+      startedAt: toIso(row.started_at),
+      completedAt: toIso(row.completed_at),
+      prompt: row.prompt,
+      output: row.output,
+      attempts: row.attempts,
+      ...(tokenUsage ? { tokenUsage } : {}),
+      lintFindings: []
+    };
+  }
+
   async appendStage(runId: string, record: StageExecutionRecord, transitionKey?: string): Promise<void> {
     const stageId = transitionKey ? stageIdFromTransitionKey(runId, transitionKey) : `stage_${randomUUID()}`;
 

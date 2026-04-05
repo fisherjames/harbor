@@ -32,6 +32,7 @@ export interface IdempotentRunLookupResult {
 export interface RunPersistence {
   createRun(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<string>;
   resolveIdempotentRun?(request: WorkflowRunRequest): Promise<IdempotentRunLookupResult | null>;
+  resolveStageReplay?(runId: string, transitionKey: string): Promise<StageExecutionRecord | null>;
   updateStatus(
     runId: string,
     status: RunStatus,

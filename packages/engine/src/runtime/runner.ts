@@ -139,6 +139,24 @@ async function runSingleStage(
   nonBlockingFindings: ReturnType<typeof filterFindingsForPrompt>,
   stageTransitionKey: string
 ): Promise<string> {
+  if (dependencies.persistence.resolveStageReplay) {
+    const replay = await dependencies.persistence.resolveStageReplay(context.runId, stageTransitionKey);
+    if (replay) {
+      dependencies.tracer.finding({
+        runId: context.runId,
+        workflowId: context.workflow.id,
+        stage,
+        message: "Stage replay deduplicated by transition key",
+        metadata: {
+          transitionKey: stageTransitionKey,
+          attempts: replay.attempts
+        }
+      });
+
+      return replay.output;
+    }
+  }
+
   const startedAt = new Date().toISOString();
   const nodeType = stageNodeType(stage);
   const node = context.workflow.nodes.find((workflowNode) => workflowNode.type === nodeType);

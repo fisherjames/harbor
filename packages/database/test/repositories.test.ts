@@ -209,6 +209,15 @@ describe("InMemoryRunPersistence", () => {
     expect(snapshot.status).toBe("running");
     expect(snapshot.details).toEqual({ started: true });
     expect(snapshot.stages).toHaveLength(1);
+
+    const replay = await persistence.resolveStageReplay(runId, "stage:plan:1");
+    expect(replay?.output).toBe("o");
+
+    const missingReplay = await persistence.resolveStageReplay(runId, "stage:missing");
+    expect(missingReplay).toBeNull();
+
+    const missingRunReplay = await persistence.resolveStageReplay("missing", "stage:plan:1");
+    expect(missingRunReplay).toBeNull();
   });
 
   it("cleans stale idempotency index entries when run records disappear", async () => {
@@ -352,6 +361,11 @@ describe("PostgresRunPersistence", () => {
         ],
         rowCount: 1
       }
+      ,
+      {
+        rows: [],
+        rowCount: 0
+      }
     ]);
 
     const persistence = new PostgresRunPersistence(db);
@@ -372,6 +386,62 @@ describe("PostgresRunPersistence", () => {
       idempotencyKey: "idem-missing"
     });
     expect(missing).toBeNull();
+  });
+
+  it("resolves staged replay records by deterministic stage id", async () => {
+    const db = new FakeDb([
+      {
+        rows: [
+          {
+            stage: "verify",
+            prompt: "verify prompt",
+            output: "PASS",
+            attempts: 2,
+            token_usage: "{\"inputTokens\":10,\"outputTokens\":5,\"totalTokens\":15}",
+            started_at: "2026-01-01T00:00:00.000Z",
+            completed_at: "2026-01-01T00:00:01.000Z"
+          }
+        ],
+        rowCount: 1
+      },
+      {
+        rows: [],
+        rowCount: 0
+      }
+    ]);
+
+    const persistence = new PostgresRunPersistence(db);
+    const replay = await persistence.resolveStageReplay("run_1", "stage:verify:3");
+    expect(replay?.stage).toBe("verify");
+    expect(replay?.output).toBe("PASS");
+    expect(replay?.tokenUsage?.totalTokens).toBe(15);
+
+    const missing = await persistence.resolveStageReplay("run_1", "stage:missing");
+    expect(missing).toBeNull();
+  });
+
+  it("resolves staged replay records when token usage is absent", async () => {
+    const db = new FakeDb([
+      {
+        rows: [
+          {
+            stage: "plan",
+            prompt: "plan prompt",
+            output: "ok",
+            attempts: 1,
+            token_usage: null,
+            started_at: "2026-01-01T00:00:00.000Z",
+            completed_at: "2026-01-01T00:00:01.000Z"
+          }
+        ],
+        rowCount: 1
+      }
+    ]);
+
+    const persistence = new PostgresRunPersistence(db);
+    const replay = await persistence.resolveStageReplay("run_1", "stage:plan:1");
+    expect(replay?.stage).toBe("plan");
+    expect(replay?.tokenUsage).toBeUndefined();
   });
 
   it("skips idempotent lookup when idempotency key is absent", async () => {
