@@ -81,4 +81,40 @@ describe("assembleStagePrompt", () => {
     expect(prompt).toContain("Replace existing guidance with: Always enforce bounded scope.");
     expect(prompt.split("Use bounded scope").length - 1).toBe(1);
   });
+
+  it("appends remediation prompt section content into harness resolution steps", () => {
+    const prompt = assembleStagePrompt({
+      stage: "execute",
+      workflow,
+      baseTask: "Do the thing",
+      lintFindings: [
+        {
+          findingId: "HAR003:node",
+          ruleId: "HAR003",
+          severity: "warning",
+          message: "Missing timeout",
+          resolutionSteps: ["Add timeout budget"]
+        }
+      ],
+      resolutionSectionAppendix:
+        "## Harness Resolution Steps\nApply these steps without changing the primary objective:\n1. Resolve repeated drift signals."
+    });
+
+    expect(prompt).toContain("## Harness Resolution Steps");
+    expect(prompt).toContain("Add timeout budget");
+    expect(prompt).toContain("Resolve repeated drift signals.");
+    expect(prompt.match(/## Harness Resolution Steps/g)).toHaveLength(1);
+  });
+
+  it("renders only appendix section when lint findings are absent", () => {
+    const prompt = assembleStagePrompt({
+      stage: "verify",
+      workflow,
+      baseTask: "Verify output",
+      resolutionSectionAppendix: "Run standards trend remediation checklist before final response."
+    });
+
+    expect(prompt).toContain("## Harness Resolution Steps");
+    expect(prompt).toContain("Run standards trend remediation checklist before final response.");
+  });
 });

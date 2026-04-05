@@ -10,10 +10,15 @@ import {
   createPostgresRunPersistence,
   type RunStore
 } from "@harbor/database";
-import { createWorkflowRunner, EchoModelProvider } from "@harbor/engine";
+import {
+  createFileStandardsRemediationProvider,
+  createWorkflowRunner,
+  EchoModelProvider
+} from "@harbor/engine";
 import { createInMemoryMemuClient, createMemuClient, type MemuClient } from "@harbor/memu";
 import { createRunTracer } from "@harbor/observability";
 import type { WorkflowDefinition } from "@harbor/harness";
+import { fileURLToPath } from "node:url";
 import { createGitHubPromotionPullRequest, runGitHubPromotionGate } from "./github-promotion";
 
 function resolveMemuClient(): MemuClient {
@@ -45,12 +50,16 @@ export function getAppRouter(): AppRouter {
 
   const runStore = resolveRunStore();
   const registry = new InMemoryWorkflowRegistry();
+  const standardsRemediationProvider = createFileStandardsRemediationProvider(
+    fileURLToPath(new URL("../../../../docs/team-standards/reports/remediation.json", import.meta.url))
+  );
 
   const runner = createWorkflowRunner({
     model: new EchoModelProvider(),
     memu: resolveMemuClient(),
     persistence: runStore,
-    tracer: createRunTracer("harbor-web")
+    tracer: createRunTracer("harbor-web"),
+    standardsRemediationProvider
   });
 
   router = createHarborRouter({

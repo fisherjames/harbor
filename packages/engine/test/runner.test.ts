@@ -125,7 +125,16 @@ describe("createWorkflowRunner", () => {
       model,
       memu,
       persistence,
-      tracer
+      tracer,
+      standardsRemediationProvider: {
+        async load() {
+          return {
+            sourcePath: "docs/team-standards/reports/remediation.json",
+            promptSection:
+              "## Harness Resolution Steps\nApply these steps without changing the primary objective:\n1. Resolve repeated trend findings."
+          };
+        }
+      }
     });
 
     const result = await runner.runWorkflow(baseRequest, {
@@ -139,6 +148,9 @@ describe("createWorkflowRunner", () => {
 
     expect(result.status).toBe("completed");
     expect(persistence.stages.some((stage) => stage.prompt.includes("## Harness Resolution Steps"))).toBe(true);
+    expect(persistence.stages.some((stage) => stage.prompt.includes("Resolve repeated trend findings."))).toBe(true);
+    expect(persistence.artifacts["standards-remediation-source"]).toContain("remediation.json");
+    expect(persistence.artifacts["standards-remediation-prompt-section"]).toContain("Resolve repeated trend findings.");
     const summary = JSON.parse(persistence.artifacts["post-run-lint-summary"]) as Record<
       string,
       { count: number; latestVersion: number }

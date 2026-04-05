@@ -36,20 +36,40 @@ function renderPatchBlock(section: PromptPatch["section"], patches: PromptPatch[
   return `## ${titleBySection[section]}\n${content}`;
 }
 
-function injectHarnessResolutionSteps(findings: LintFinding[]): string {
-  if (findings.length === 0) {
+function normalizeResolutionAppendix(section: string): string {
+  const trimmed = section.trim();
+  if (trimmed.length === 0) {
     return "";
   }
 
-  const steps = findings
-    .flatMap((finding) => finding.resolutionSteps)
-    .filter((step) => step.trim().length > 0);
+  const lines = trimmed.split(/\r?\n/);
+  if (lines[0]?.trim().toLowerCase() === "## harness resolution steps") {
+    return lines.slice(1).join("\n").trim();
+  }
 
-  const dedupedSteps = uniquePreserveOrder(steps)
-    .map((step, index) => `${index + 1}. ${step}`)
-    .join("\n");
+  return trimmed;
+}
 
-  return `## Harness Resolution Steps\nApply these steps without changing the primary objective:\n${dedupedSteps}`;
+function injectHarnessResolutionSteps(findings: LintFinding[], sectionAppendix?: string): string {
+  const steps = uniquePreserveOrder(
+    findings.flatMap((finding) => finding.resolutionSteps).filter((step) => step.trim().length > 0)
+  );
+  const renderedSteps = steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+  const appendix = normalizeResolutionAppendix(sectionAppendix ?? "");
+
+  if (renderedSteps.length === 0 && appendix.length === 0) {
+    return "";
+  }
+
+  const sections: string[] = [];
+  if (renderedSteps.length > 0) {
+    sections.push(`Apply these steps without changing the primary objective:\n${renderedSteps}`);
+  }
+  if (appendix.length > 0) {
+    sections.push(appendix);
+  }
+
+  return `## Harness Resolution Steps\n${sections.join("\n\n")}`;
 }
 
 function buildVerifierCheckpoint(findings: LintFinding[]): string {
@@ -84,7 +104,7 @@ export function assembleStagePrompt(input: AssemblePromptInput): string {
     renderPatchBlock("verification", verification),
     renderPatchBlock("tooling", tooling),
     renderPatchBlock("memory", memory),
-    injectHarnessResolutionSteps(lintFindings),
+    injectHarnessResolutionSteps(lintFindings, input.resolutionSectionAppendix),
     buildVerifierCheckpoint(lintFindings)
   ];
 

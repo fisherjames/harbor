@@ -73,4 +73,5 @@ export interface AssemblePromptInput {
   baseTask: string;
   memoryContext?: string | undefined;
   lintFindings?: LintFinding[] | undefined;
+  resolutionSectionAppendix?: string | undefined;
 }

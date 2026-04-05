@@ -56,11 +56,21 @@ export interface RunIsolationManager {
   teardown(context: RunContext, session: RunIsolationSession, outcome: RunStatus): Promise<void>;
 }
 
+export interface StandardsRemediationSnapshot {
+  sourcePath: string;
+  promptSection: string;
+}
+
+export interface StandardsRemediationProvider {
+  load(): Promise<StandardsRemediationSnapshot | null>;
+}
+
 export interface WorkflowRunnerDependencies {
   model: ModelProvider;
   memu: MemuClient;
   persistence: RunPersistence;
   tracer: HarborRunTracer;
   runIsolation?: RunIsolationManager | undefined;
+  standardsRemediationProvider?: StandardsRemediationProvider | undefined;
   maxFixAttempts?: number;
 }

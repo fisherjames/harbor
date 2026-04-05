@@ -14,7 +14,10 @@ export type {
   RunPersistence,
   RunIsolationSession,
   RunIsolationManager,
+  StandardsRemediationProvider,
+  StandardsRemediationSnapshot,
   WorkflowRunnerDependencies
 } from "./contracts/runtime.js";
 export { createWorkflowRunner } from "./runtime/runner.js";
 export { EchoModelProvider } from "./runtime/echo-model.js";
+export { createFileStandardsRemediationProvider } from "./runtime/standards-remediation.js";

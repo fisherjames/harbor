@@ -1,5 +1,11 @@
 import { Inngest } from "inngest";
-import { createWorkflowRunner, EchoModelProvider, type WorkflowRunRequest } from "@harbor/engine";
+import { fileURLToPath } from "node:url";
+import {
+  createFileStandardsRemediationProvider,
+  createWorkflowRunner,
+  EchoModelProvider,
+  type WorkflowRunRequest
+} from "@harbor/engine";
 import { createInMemoryMemuClient, createMemuClient, type MemuClient } from "@harbor/memu";
 import { createRunTracer } from "@harbor/observability";
 import {
@@ -31,6 +37,9 @@ const persistence: RunStore = process.env.DATABASE_URL
   : new InMemoryRunPersistence();
 const tracer = createRunTracer("harbor-worker");
 const runIsolation = createWorktreeBoundRunIsolationManager();
+const standardsRemediationProvider = createFileStandardsRemediationProvider(
+  fileURLToPath(new URL("../../../docs/team-standards/reports/remediation.json", import.meta.url))
+);
 
 const runner = createWorkflowRunner({
   model: new EchoModelProvider(),
@@ -38,6 +47,7 @@ const runner = createWorkflowRunner({
   persistence,
   tracer,
   runIsolation,
+  standardsRemediationProvider,
   maxFixAttempts: 1
 });
 

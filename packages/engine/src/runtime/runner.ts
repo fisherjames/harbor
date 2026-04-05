@@ -4,6 +4,7 @@ import {
   generateRemediationRecommendations,
   runLintAtExecutionPoint,
   summarizePostRunFindings,
+  type LintFinding,
   type WorkflowDefinition
 } from "@harbor/harness";
 import type { MemuWriteInput } from "@harbor/memu";
@@ -49,6 +50,21 @@ function uniquePreserveOrder(values: string[]): string[] {
 
 function resolutionStepsFromFindings(findings: ReturnType<typeof filterFindingsForPrompt>): string[] {
   return uniquePreserveOrder(findings.flatMap((finding) => finding.resolutionSteps));
+}
+
+function remediationPromptSectionToFinding(): LintFinding {
+  return {
+    findingId: "HAR-STANDARDS-TREND",
+    ruleId: "HAR-STANDARDS-TREND",
+    severity: "warning",
+    message: "Apply standards trend remediation steps.",
+    resolutionSteps: [],
+    promptPatch: {
+      section: "verification",
+      operation: "append",
+      content: "Confirm trend remediation steps were applied before final PASS."
+    }
+  };
 }
 
 function stageNodeType(stage: RunStage): "planner" | "executor" | "verifier" {
@@ -137,7 +153,8 @@ async function runSingleStage(
   context: RunContext,
   dependencies: WorkflowRunnerDependencies,
   nonBlockingFindings: ReturnType<typeof filterFindingsForPrompt>,
-  stageTransitionKey: string
+  stageTransitionKey: string,
+  resolutionSectionAppendix?: string
 ): Promise<string> {
   if (dependencies.persistence.resolveStageReplay) {
     const replay = await dependencies.persistence.resolveStageReplay(context.runId, stageTransitionKey);
@@ -170,6 +187,7 @@ async function runSingleStage(
     workflow: context.workflow,
     baseTask: `${context.workflow.systemPrompt}\n\nInput: ${JSON.stringify(context.request.input)}`,
     lintFindings: nonBlockingFindings,
+    ...(resolutionSectionAppendix ? { resolutionSectionAppendix } : {}),
     ...(memoryContext ? { memoryContext } : {})
   } as const;
 
@@ -367,6 +385,24 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
         }
 
         const nonBlockingFindings = filterFindingsForPrompt(lintReport.findings);
+        let remediationPromptSection: string | undefined;
+        if (dependencies.standardsRemediationProvider) {
+          const remediationSnapshot = await dependencies.standardsRemediationProvider.load();
+          if (remediationSnapshot?.promptSection) {
+            remediationPromptSection = remediationSnapshot.promptSection;
+            nonBlockingFindings.push(remediationPromptSectionToFinding());
+            await dependencies.persistence.storeArtifact(
+              runId,
+              "standards-remediation-source",
+              remediationSnapshot.sourcePath
+            );
+            await dependencies.persistence.storeArtifact(
+              runId,
+              "standards-remediation-prompt-section",
+              remediationPromptSection
+            );
+          }
+        }
         const resolutionSteps = resolutionStepsFromFindings(nonBlockingFindings);
 
         if (resolutionSteps.length > 0) {
@@ -378,21 +414,24 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           context,
           dependencies,
           nonBlockingFindings,
-          nextStageTransitionKey("plan")
+          nextStageTransitionKey("plan"),
+          remediationPromptSection
         );
         const executeOutput = await runSingleStage(
           "execute",
           context,
           dependencies,
           nonBlockingFindings,
-          nextStageTransitionKey("execute")
+          nextStageTransitionKey("execute"),
+          remediationPromptSection
         );
         let verifyOutput = await runSingleStage(
           "verify",
           context,
           dependencies,
           nonBlockingFindings,
-          nextStageTransitionKey("verify")
+          nextStageTransitionKey("verify"),
+          remediationPromptSection
         );
 
         if (!verifyPassed(verifyOutput)) {
@@ -408,14 +447,16 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
               context,
               dependencies,
               nonBlockingFindings,
-              nextStageTransitionKey("fix")
+              nextStageTransitionKey("fix"),
+              remediationPromptSection
             );
             verifyOutput = await runSingleStage(
               "verify",
               context,
               dependencies,
               nonBlockingFindings,
-              nextStageTransitionKey("verify")
+              nextStageTransitionKey("verify"),
+              remediationPromptSection
             );
 
             if (verifyPassed(verifyOutput)) {
