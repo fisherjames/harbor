@@ -32,7 +32,8 @@
     "docs/architecture/decision-records/0002-api-tenancy-boundaries.md",
     "docs/architecture/decision-records/0003-workflow-version-lifecycle.md",
     "docs/architecture/decision-records/0004-tool-call-budget-policy.md",
-    "docs/architecture/decision-records/0005-run-worktree-isolation.md"
+    "docs/architecture/decision-records/0005-run-worktree-isolation.md",
+    "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,
@@ -40,6 +41,8 @@
     "nonCriticalFindingsInjectResolutionSteps": true,
     "worktreeBoundRuns": true,
     "runCanBuildWholeStack": true,
-    "ephemeralObservabilityPerRun": true
+    "ephemeralObservabilityPerRun": true,
+    "evalGateOnDeploy": true,
+    "githubPromotionChecks": true
   }
 }

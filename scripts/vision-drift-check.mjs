@@ -133,6 +133,46 @@ if (!apiRouter.includes("blocked: true")) {
   pass("Publish path exposes blocked response payload");
 }
 
+if (visionContract.requiredPolicies?.evalGateOnDeploy) {
+  if (!apiRouter.includes("resolveDeployGates")) {
+    fail("Deploy gate drift: deploy/publish gate resolver is missing from API router");
+  } else {
+    pass("Deploy/publish gate resolver present in API router");
+  }
+
+  if (!apiRouter.includes('event: "deploy"')) {
+    fail("Deploy gate drift: deploy path no longer tags gate execution with event=deploy");
+  } else {
+    pass("Deploy path tags gate execution with event=deploy");
+  }
+
+  if (!/eval\s+gate/.test(normalizedVisionDoc)) {
+    fail("Vision drift: eval gate requirement missing from vision.md");
+  } else {
+    pass("Vision includes eval gate requirement");
+  }
+}
+
+if (visionContract.requiredPolicies?.githubPromotionChecks) {
+  if (!apiRouter.includes("runPromotionChecks")) {
+    fail("Promotion drift: GitHub promotion check hook is missing from API router");
+  } else {
+    pass("API router includes promotion check hook");
+  }
+
+  if (!apiRouter.includes('provider: "github"')) {
+    fail("Promotion drift: API router no longer defaults promotion checks to provider=github");
+  } else {
+    pass("API router keeps GitHub promotion provider default");
+  }
+
+  if (!/(github.*promotion|promotion.*github)/.test(normalizedVisionDoc)) {
+    fail("Vision drift: GitHub promotion requirement missing from vision.md");
+  } else {
+    pass("Vision includes GitHub promotion requirement");
+  }
+}
+
 const engineRunner = readText("packages/engine/src/runtime/runner.ts");
 if (!engineRunner.includes("harness-resolution-steps")) {
   fail("Harness drift: runtime no longer persists harness resolution artifacts");

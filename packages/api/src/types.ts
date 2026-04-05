@@ -1,6 +1,35 @@
 import type { LintFinding, WorkflowDefinition } from "@harbor/harness";
 import type { RunStatus, StageExecutionRecord } from "@harbor/engine";
 
+export type DeployGateStatus = "passed" | "failed" | "skipped";
+export type DeployBlockReason = "lint" | "eval" | "promotion";
+
+export interface EvalGateSummary {
+  suiteId: string;
+  status: DeployGateStatus;
+  blocked: boolean;
+  score: number;
+  summary: string;
+  failingScenarios: string[];
+}
+
+export interface PromotionCheckSummary {
+  checkId: string;
+  status: DeployGateStatus;
+  summary: string;
+}
+
+export interface PromotionGateSummary {
+  provider: "github";
+  repository: string;
+  branch: string;
+  status: DeployGateStatus;
+  blocked: boolean;
+  checks: PromotionCheckSummary[];
+  pullRequestNumber?: number | undefined;
+  pullRequestUrl?: string | undefined;
+}
+
 export interface DeployWorkflowInput {
   workflowId: string;
   expectedVersion: number;
@@ -10,6 +39,9 @@ export interface DeployWorkflowInput {
 export interface DeployWorkflowOutput {
   deploymentId: string;
   lintFindings: LintFinding[];
+  evalGate: EvalGateSummary;
+  promotionGate: PromotionGateSummary;
+  blockedReasons: DeployBlockReason[];
   blocked: boolean;
 }
 
@@ -106,5 +138,8 @@ export interface PublishWorkflowVersionOutput {
   version: number;
   state: "published";
   lintFindings: LintFinding[];
+  evalGate: EvalGateSummary;
+  promotionGate: PromotionGateSummary;
+  blockedReasons: DeployBlockReason[];
   blocked: boolean;
 }

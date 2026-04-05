@@ -20,6 +20,7 @@
         "apps/web/app/workflows/[workflowId]/builder/page.tsx",
         "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
         "packages/api/src/router.ts",
+        "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
         "packages/database/src/repositories/workflow-registry.ts",
         "docs/getting-started.md"
       ]

@@ -253,6 +253,138 @@ describe("createHarborRouter", () => {
 
     expect(result.deploymentId).toContain("dep_");
     expect(result.blocked).toBe(false);
+    expect(result.blockedReasons).toEqual([]);
+    expect(result.evalGate.status).toBe("passed");
+    expect(result.promotionGate.status).toBe("passed");
+  });
+
+  it("skips eval and promotion gates when deploy lint is critical", async () => {
+    const evalCalls: string[] = [];
+    const promotionCalls: string[] = [];
+    const router = createRouter({
+      async runEvalGate(_context, input) {
+        evalCalls.push(input.event);
+        return {
+          suiteId: "eval-smoke",
+          status: "passed",
+          blocked: false,
+          score: 1,
+          summary: "ok",
+          failingScenarios: []
+        };
+      },
+      async runPromotionChecks(_context, input) {
+        promotionCalls.push(input.event);
+        return {
+          provider: "github",
+          repository: "owner/repo",
+          branch: "main",
+          status: "passed",
+          blocked: false,
+          checks: [
+            {
+              checkId: "github/checks",
+              status: "passed",
+              summary: "ok"
+            }
+          ]
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow: {
+        ...workflow,
+        nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+      }
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toEqual(["lint"]);
+    expect(result.evalGate.status).toBe("skipped");
+    expect(result.promotionGate.status).toBe("skipped");
+    expect(evalCalls).toEqual([]);
+    expect(promotionCalls).toEqual([]);
+  });
+
+  it("blocks deploy when eval gate fails", async () => {
+    const promotionCalls: string[] = [];
+    const router = createRouter({
+      async runEvalGate() {
+        return {
+          suiteId: "eval-smoke",
+          status: "failed",
+          blocked: true,
+          score: 0.1,
+          summary: "Regression detected",
+          failingScenarios: ["planner_regression"]
+        };
+      },
+      async runPromotionChecks(_context, input) {
+        promotionCalls.push(input.event);
+        return {
+          provider: "github",
+          repository: "owner/repo",
+          branch: "main",
+          status: "passed",
+          blocked: false,
+          checks: [
+            {
+              checkId: "github/checks",
+              status: "passed",
+              summary: "ok"
+            }
+          ]
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("eval");
+    expect(result.evalGate.status).toBe("failed");
+    expect(promotionCalls).toEqual(["deploy"]);
+  });
+
+  it("blocks deploy when promotion checks fail", async () => {
+    const router = createRouter({
+      async runPromotionChecks() {
+        return {
+          provider: "github",
+          repository: "owner/repo",
+          branch: "main",
+          status: "failed",
+          blocked: true,
+          checks: [
+            {
+              checkId: "github/checks",
+              status: "failed",
+              summary: "Required check failed"
+            }
+          ]
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("promotion");
+    expect(result.promotionGate.status).toBe("failed");
   });
 
   it("lists workflow versions", async () => {
@@ -335,6 +467,89 @@ describe("createHarborRouter", () => {
 
     expect(result.blocked).toBe(true);
     expect(result.lintFindings.some((finding) => finding.ruleId === "HAR001")).toBe(true);
+    expect(result.blockedReasons).toEqual(["lint"]);
+    expect(result.evalGate.status).toBe("skipped");
+    expect(result.promotionGate.status).toBe("skipped");
+    expect(publishCalls).toHaveLength(0);
+  });
+
+  it("blocks publish when eval gate fails before publish mutation", async () => {
+    const publishCalls: string[] = [];
+    const router = createRouter({
+      async runEvalGate() {
+        return {
+          suiteId: "eval-smoke",
+          status: "failed",
+          blocked: true,
+          score: 0.2,
+          summary: "Regression detected",
+          failingScenarios: ["verify_budget"]
+        };
+      },
+      async publishWorkflowVersion(_context, input) {
+        publishCalls.push(`${input.workflowId}:${input.version}`);
+        return {
+          workflowId: input.workflowId,
+          version: input.version,
+          state: "published",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("eval");
+    expect(result.evalGate.status).toBe("failed");
+    expect(publishCalls).toHaveLength(0);
+  });
+
+  it("blocks publish when promotion checks fail before publish mutation", async () => {
+    const publishCalls: string[] = [];
+    const router = createRouter({
+      async runPromotionChecks() {
+        return {
+          provider: "github",
+          repository: "owner/repo",
+          branch: "main",
+          status: "failed",
+          blocked: true,
+          checks: [
+            {
+              checkId: "github/pr-required",
+              status: "failed",
+              summary: "Check suite failed"
+            }
+          ]
+        };
+      },
+      async publishWorkflowVersion(_context, input) {
+        publishCalls.push(`${input.workflowId}:${input.version}`);
+        return {
+          workflowId: input.workflowId,
+          version: input.version,
+          state: "published",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("promotion");
+    expect(result.promotionGate.status).toBe("failed");
     expect(publishCalls).toHaveLength(0);
   });
 
@@ -387,6 +602,9 @@ describe("createHarborRouter", () => {
     expect(published.version).toBe(workflow.version);
     expect(published.state).toBe("published");
     expect(published.blocked).toBe(false);
+    expect(published.evalGate.status).toBe("passed");
+    expect(published.promotionGate.status).toBe("passed");
+    expect(published.blockedReasons).toEqual([]);
   });
 
   it("accepts typed tool policy fields in workflow input", async () => {

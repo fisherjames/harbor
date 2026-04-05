@@ -29,6 +29,7 @@
 - Keep harness rules (`HAR001`-`HAR005`) aligned with this guide and runtime behavior.
 - Keep linter remediation language aligned with the runtime `Harness Resolution Steps` section.
 - Keep runtime guarantees documented: worktree-bound execution, per-run ephemeral observability, and run idempotency key behavior.
+- Keep promotion guarantees documented: deploy/publish must report eval gate and GitHub promotion check outcomes.
 
 ## Milestone Verification
 

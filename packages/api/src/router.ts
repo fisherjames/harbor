@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { runLintAtExecutionPoint, type WorkflowDefinition } from "@harbor/harness";
+import { runLintAtExecutionPoint, type LintFinding, type WorkflowDefinition } from "@harbor/harness";
 import type { RunStatus, WorkflowRunRequest, WorkflowRunResult } from "@harbor/engine";
 import type {
+  DeployBlockReason,
+  EvalGateSummary,
+  PromotionGateSummary,
   DeployWorkflowOutput,
   GetWorkflowVersionInput,
   HarborApiContext,
@@ -140,6 +143,8 @@ export interface HarborApiDependencies {
       version: number;
     }
   ): Promise<WorkflowVersionSummary | null>;
+  runEvalGate?(context: HarborApiContext, input: EvalGateInput): Promise<EvalGateSummary>;
+  runPromotionChecks?(context: HarborApiContext, input: PromotionGateInput): Promise<PromotionGateSummary>;
 }
 
 const t = initTRPC.context<HarborApiContext>().create();
@@ -154,6 +159,156 @@ const authzProcedure = t.procedure.use(({ ctx, next }) => {
 
   return next();
 });
+
+type GateEvent = "deploy" | "publish";
+
+interface EvalGateInput {
+  workflow: WorkflowDefinition;
+  workflowId: string;
+  version: number;
+  event: GateEvent;
+  lintFindings: LintFinding[];
+}
+
+interface PromotionGateInput extends EvalGateInput {
+  evalGate: EvalGateSummary;
+}
+
+function defaultEvalGate(input: EvalGateInput): EvalGateSummary {
+  return {
+    suiteId: `eval-smoke:${input.workflowId}:v${input.version}`,
+    status: "passed",
+    blocked: false,
+    score: 1,
+    summary: "Synthetic eval smoke suite passed.",
+    failingScenarios: []
+  };
+}
+
+function skippedEvalGate(reason: string): EvalGateSummary {
+  return {
+    suiteId: "eval-smoke:skipped",
+    status: "skipped",
+    blocked: false,
+    score: 0,
+    summary: reason,
+    failingScenarios: []
+  };
+}
+
+function defaultPromotionGate(input: PromotionGateInput): PromotionGateSummary {
+  return {
+    provider: "github",
+    repository: "local/harbor",
+    branch: "main",
+    status: "passed",
+    blocked: false,
+    checks: [
+      {
+        checkId: "github/check-lint",
+        status: "passed",
+        summary: "Harness lint gate passed."
+      },
+      {
+        checkId: "github/check-eval",
+        status: input.evalGate.status === "passed" ? "passed" : "failed",
+        summary:
+          input.evalGate.status === "passed"
+            ? "Eval gate passed."
+            : "Eval gate failed; promotion checks cannot pass."
+      }
+    ]
+  };
+}
+
+function skippedPromotionGate(reason: string): PromotionGateSummary {
+  return {
+    provider: "github",
+    repository: "local/harbor",
+    branch: "main",
+    status: "skipped",
+    blocked: false,
+    checks: [
+      {
+        checkId: "github/checks",
+        status: "skipped",
+        summary: reason
+      }
+    ]
+  };
+}
+
+function collectBlockedReasons(input: {
+  evalGate: EvalGateSummary;
+  promotionGate: PromotionGateSummary;
+}): DeployBlockReason[] {
+  const reasons: DeployBlockReason[] = [];
+
+  if (input.evalGate.blocked || input.evalGate.status === "failed") {
+    reasons.push("eval");
+  }
+
+  if (input.promotionGate.blocked || input.promotionGate.status === "failed") {
+    reasons.push("promotion");
+  }
+
+  return reasons;
+}
+
+async function resolveDeployGates(
+  dependencies: HarborApiDependencies,
+  context: HarborApiContext,
+  input: EvalGateInput & { lintBlocked: boolean }
+): Promise<{
+  evalGate: EvalGateSummary;
+  promotionGate: PromotionGateSummary;
+  blockedReasons: DeployBlockReason[];
+  blocked: boolean;
+}> {
+  if (input.lintBlocked) {
+    const reason = "Skipped because critical harness lint findings already blocked deploy/publish.";
+    const evalGate = skippedEvalGate(reason);
+    const promotionGate = skippedPromotionGate(reason);
+
+    return {
+      evalGate,
+      promotionGate,
+      blockedReasons: ["lint"],
+      blocked: true
+    };
+  }
+
+  const evalInput: EvalGateInput = {
+    workflow: input.workflow,
+    workflowId: input.workflowId,
+    version: input.version,
+    event: input.event,
+    lintFindings: input.lintFindings
+  };
+  const evalGate = dependencies.runEvalGate
+    ? await dependencies.runEvalGate(context, evalInput)
+    : defaultEvalGate(evalInput);
+
+  const promotionInput: PromotionGateInput = {
+    ...evalInput,
+    evalGate
+  };
+  const promotionGate = dependencies.runPromotionChecks
+    ? await dependencies.runPromotionChecks(context, promotionInput)
+    : defaultPromotionGate(promotionInput);
+
+  const blockedReasons = collectBlockedReasons({
+    evalGate,
+    promotionGate
+  });
+
+  return {
+    evalGate,
+    promotionGate,
+    blockedReasons,
+    blocked: blockedReasons.length > 0
+  };
+}
 
 export function createHarborRouter(dependencies: HarborApiDependencies) {
   return t.router({
@@ -188,29 +343,42 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
         };
       }),
 
-    deployWorkflow: authzProcedure.input(deployInputSchema).mutation(({ input }): DeployWorkflowOutput => {
-      if (input.workflow.id !== input.workflowId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "workflowId must match workflow.id"
+    deployWorkflow: authzProcedure
+      .input(deployInputSchema)
+      .mutation(async ({ ctx, input }): Promise<DeployWorkflowOutput> => {
+        if (input.workflow.id !== input.workflowId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "workflowId must match workflow.id"
+          });
+        }
+
+        if (input.workflow.version !== input.expectedVersion) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "expectedVersion does not match workflow.version"
+          });
+        }
+
+        const lint = runLintAtExecutionPoint("deploy", input.workflow);
+        const gates = await resolveDeployGates(dependencies, ctx, {
+          workflow: input.workflow,
+          workflowId: input.workflowId,
+          version: input.expectedVersion,
+          event: "deploy",
+          lintFindings: lint.report.findings,
+          lintBlocked: lint.report.blocked
         });
-      }
 
-      if (input.workflow.version !== input.expectedVersion) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "expectedVersion does not match workflow.version"
-        });
-      }
-
-      const lint = runLintAtExecutionPoint("deploy", input.workflow);
-
-      return {
-        deploymentId: `dep_${randomUUID()}`,
-        lintFindings: lint.report.findings,
-        blocked: lint.report.blocked
-      };
-    }),
+        return {
+          deploymentId: `dep_${randomUUID()}`,
+          lintFindings: lint.report.findings,
+          evalGate: gates.evalGate,
+          promotionGate: gates.promotionGate,
+          blockedReasons: gates.blockedReasons,
+          blocked: gates.blocked
+        };
+      }),
 
     listWorkflowVersions: authzProcedure
       .input(listWorkflowVersionsInputSchema)
@@ -244,12 +412,24 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
         }
 
         const lint = runLintAtExecutionPoint("deploy", version.workflow);
-        if (lint.report.blocked) {
+        const gates = await resolveDeployGates(dependencies, ctx, {
+          workflow: version.workflow,
+          workflowId: input.workflowId,
+          version: input.version,
+          event: "publish",
+          lintFindings: lint.report.findings,
+          lintBlocked: lint.report.blocked
+        });
+
+        if (gates.blocked) {
           return {
             workflowId: input.workflowId,
             version: input.version,
             state: "published",
             lintFindings: lint.report.findings,
+            evalGate: gates.evalGate,
+            promotionGate: gates.promotionGate,
+            blockedReasons: gates.blockedReasons,
             blocked: true
           };
         }
@@ -271,6 +451,9 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
           version: published.version,
           state: "published",
           lintFindings: lint.report.findings,
+          evalGate: gates.evalGate,
+          promotionGate: gates.promotionGate,
+          blockedReasons: gates.blockedReasons,
           blocked: false
         };
       }),

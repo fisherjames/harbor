@@ -8,6 +8,7 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Execute with durable, staged orchestration (`plan -> execute -> verify -> fix`).
 - Execute each run inside its own isolated git worktree context.
 - Enforce safety and quality through harness lint and policy gates.
+- Require deploy/publish promotion gates with eval smoke checks and GitHub check-status parity.
 - Preserve context and reduce token waste with memU-backed retrieval/writeback.
 - Support multi-tenant operation with strict tenancy boundaries and auditability.
 - Provide per-run ephemeral observability so traces/log pipelines are isolated and disposable by run.
@@ -35,6 +36,7 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 ## Non-Negotiable Invariants
 - API procedures must enforce `tenantId`, `workspaceId`, and `actorId` scoping.
 - Critical harness lint findings block deployment/publish.
+- Deploy/publish paths require passing eval gates and GitHub promotion checks before state promotion.
 - Prompt mutations happen only through harness middleware pathways.
 - Workflow nodes carry explicit ownership and execution budgets.
 - Tool-call nodes carry explicit tool scopes plus `toolCallPolicy` (`timeoutMs`, `retryLimit`, `maxCalls`).

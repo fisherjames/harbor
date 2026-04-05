@@ -1,4 +1,9 @@
 export type {
+  DeployGateStatus,
+  DeployBlockReason,
+  EvalGateSummary,
+  PromotionCheckSummary,
+  PromotionGateSummary,
   DeployWorkflowInput,
   DeployWorkflowOutput,
   HarborApiContext,
