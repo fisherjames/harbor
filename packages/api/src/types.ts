@@ -87,6 +87,15 @@ export interface ListWorkflowVersionsInput {
   workflowId: string;
 }
 
+export interface GetWorkflowVersionInput {
+  workflowId: string;
+  version: number;
+}
+
+export interface WorkflowVersionDetail extends WorkflowVersionSummary {
+  workflow: WorkflowDefinition;
+}
+
 export interface PublishWorkflowVersionInput {
   workflowId: string;
   version: number;

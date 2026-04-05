@@ -13,6 +13,8 @@ export type {
   SaveWorkflowVersionInput,
   SaveWorkflowVersionOutput,
   ListWorkflowVersionsInput,
+  GetWorkflowVersionInput,
+  WorkflowVersionDetail,
   PublishWorkflowVersionInput,
   PublishWorkflowVersionOutput
 } from "./types.js";

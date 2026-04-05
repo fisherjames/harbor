@@ -151,6 +151,38 @@ describe("workflow runner paths", () => {
     expect(persistence.status).toBe("failed");
   });
 
+  it("stores deduplicated harness resolution steps for warning findings", async () => {
+    const model: ModelProvider = {
+      async generate({ stage }) {
+        return {
+          output: stage === "verify" ? "PASS" : "ok",
+          latencyMs: 1
+        };
+      }
+    };
+
+    const warningWorkflow: WorkflowDefinition = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) => {
+        const { timeoutMs: _timeoutMs, retryLimit: _retryLimit, ...rest } = node;
+        return rest;
+      })
+    };
+
+    const persistence = new CapturePersistence();
+    const runner = createWorkflowRunner({ model, memu, tracer, persistence });
+
+    const result = await runner.runWorkflow(request, warningWorkflow);
+    expect(result.status).toBe("completed");
+
+    const rawSteps = persistence.artifacts["harness-resolution-steps"];
+    expect(rawSteps).toBeDefined();
+
+    const steps = JSON.parse(rawSteps ?? "[]") as string[];
+    expect(steps.some((step) => step.includes("timeoutMs and retryLimit"))).toBe(true);
+    expect(steps.filter((step) => step === "Escalate to human after retry budget exhaustion.")).toHaveLength(1);
+  });
+
   it("blocks runs without memory policy and skips memu reads/writes", async () => {
     let memuReadCalls = 0;
     let memuWriteCalls = 0;

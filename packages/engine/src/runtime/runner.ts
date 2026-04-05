@@ -13,6 +13,26 @@ import { withRetry } from "./retry.js";
 
 const STAGES: RunStage[] = ["plan", "execute", "verify"];
 
+function uniquePreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function resolutionStepsFromFindings(findings: ReturnType<typeof filterFindingsForPrompt>): string[] {
+  return uniquePreserveOrder(findings.flatMap((finding) => finding.resolutionSteps));
+}
+
 function stageNodeType(stage: RunStage): "planner" | "executor" | "verifier" {
   if (stage === "plan") {
     return "planner";
@@ -212,6 +232,11 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
       }
 
       const nonBlockingFindings = filterFindingsForPrompt(lintReport.findings);
+      const resolutionSteps = resolutionStepsFromFindings(nonBlockingFindings);
+
+      if (resolutionSteps.length > 0) {
+        await dependencies.persistence.storeArtifact(runId, "harness-resolution-steps", JSON.stringify(resolutionSteps));
+      }
 
       try {
         await runSingleStage("plan", context, dependencies, nonBlockingFindings);

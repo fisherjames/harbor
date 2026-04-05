@@ -5,6 +5,7 @@ import { runLintAtExecutionPoint, type WorkflowDefinition } from "@harbor/harnes
 import type { RunStatus, WorkflowRunRequest, WorkflowRunResult } from "@harbor/engine";
 import type {
   DeployWorkflowOutput,
+  GetWorkflowVersionInput,
   HarborApiContext,
   ListRunsInput,
   PublishWorkflowVersionOutput,
@@ -69,6 +70,11 @@ const saveWorkflowVersionInputSchema = z.object({
 
 const listWorkflowVersionsInputSchema = z.object({
   workflowId: z.string().min(1)
+});
+
+const getWorkflowVersionInputSchema = z.object({
+  workflowId: z.string().min(1),
+  version: z.number().int().min(1)
 });
 
 const publishWorkflowVersionInputSchema = z.object({
@@ -202,6 +208,20 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
       .input(listWorkflowVersionsInputSchema)
       .query(async ({ ctx, input }) => {
         return dependencies.listWorkflowVersions(ctx, input.workflowId);
+      }),
+
+    getWorkflowVersion: authzProcedure
+      .input(getWorkflowVersionInputSchema)
+      .query(async ({ ctx, input }: { ctx: HarborApiContext; input: GetWorkflowVersionInput }) => {
+        const version = await dependencies.getWorkflowVersion(ctx, input.workflowId, input.version);
+        if (!version) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Workflow version not found"
+          });
+        }
+
+        return version;
       }),
 
     publishWorkflowVersion: authzProcedure

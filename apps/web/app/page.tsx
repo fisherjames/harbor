@@ -20,6 +20,9 @@ export default async function HomePage() {
         <p>Workflow: {saveResult.workflowId}</p>
         <p>Blocked: {String(saveResult.blocked)}</p>
         <p>Findings: {saveResult.lintFindings.length}</p>
+        <p>
+          <Link href={`/workflows/${sampleWorkflow.id}/builder`}>Open workflow builder</Link>
+        </p>
       </section>
       <section style={{ marginTop: 24 }}>
         <h2>Run Workflow</h2>

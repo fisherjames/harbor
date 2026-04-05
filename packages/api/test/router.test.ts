@@ -267,6 +267,38 @@ describe("createHarborRouter", () => {
     expect(versions[0]?.workflowId).toBe(workflow.id);
   });
 
+  it("gets a workflow version", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const version = await caller.getWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(version.workflowId).toBe(workflow.id);
+    expect(version.version).toBe(workflow.version);
+    expect(version.workflow.id).toBe(workflow.id);
+  });
+
+  it("returns not found when requested workflow version is missing", async () => {
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.getWorkflowVersion({
+        workflowId: workflow.id,
+        version: workflow.version
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
   it("blocks publish when deploy lint is critical", async () => {
     const publishCalls: string[] = [];
     const router = createRouter({
