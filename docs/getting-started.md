@@ -38,6 +38,7 @@
 - Keep team standards encoding guarantees documented: instruction anatomy and calibration history must pass `pnpm standards:check`.
 - Keep team standards drift report current at `docs/team-standards/reports/latest.json`.
 - Keep team standards rolling history current at `docs/team-standards/reports/history/index.json` with retention policy.
+- Keep team standards remediation report current at `docs/team-standards/reports/remediation.json` with `## Harness Resolution Steps`.
 
 ## Milestone Verification
 

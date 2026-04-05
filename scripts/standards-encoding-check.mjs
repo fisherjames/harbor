@@ -63,6 +63,49 @@ if (!fileExists(contractPath)) {
 
 const contract = readJson(contractPath);
 
+const trendState = {
+  windowEntries: 0,
+  warningSignals: [],
+  failureSignals: [],
+  harnessResolutionSteps: [],
+  promptSection: ""
+};
+
+function uniquePreserveOrder(values) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function normalizeFindingMessage(message) {
+  return String(message ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isTrendSyntheticMessage(message) {
+  return message.startsWith("Standards trend gate:");
+}
+
+function buildHarnessResolutionPromptSection(steps) {
+  if (steps.length === 0) {
+    return "";
+  }
+
+  const rendered = steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+  return `## Harness Resolution Steps\nApply these steps without changing the primary objective:\n${rendered}`;
+}
+
 function readCurrentPhase() {
   const phaseTrackerPath = "docs/strategy/phase-tracker.json";
   if (!fileExists(phaseTrackerPath)) {
@@ -100,6 +143,12 @@ function buildReport() {
       warnings: warnings.length,
       failures: failures.length
     },
+    trendSummary: {
+      windowEntries: trendState.windowEntries,
+      warningSignals: trendState.warningSignals,
+      failureSignals: trendState.failureSignals
+    },
+    harnessResolutionSteps: [...trendState.harnessResolutionSteps],
     failures: [...failures],
     warnings: [...warnings],
     passes: [...passes]
@@ -139,7 +188,7 @@ function writeHistoryReport() {
     typeof historyIndexPath !== "string" ||
     historyIndexPath.length === 0
   ) {
-    return;
+    return null;
   }
 
   const retention = reportConfig.retention ?? {};
@@ -273,6 +322,279 @@ function writeHistoryReport() {
   fs.mkdirSync(path.dirname(absoluteHistoryIndexPath), { recursive: true });
   fs.writeFileSync(absoluteHistoryIndexPath, `${JSON.stringify(finalIndex, null, 2)}\n`, "utf8");
   pass(`Updated standards history index: ${historyIndexPath}`);
+
+  return {
+    historyIndexPath,
+    historyDir,
+    historyIndex: finalIndex
+  };
+}
+
+function collectTrendSignals(historyEntries, windowEntries) {
+  const warningSignals = new Map();
+  const failureSignals = new Map();
+
+  const entries = historyEntries.slice(0, windowEntries);
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const reportPath = String(entry.path ?? "");
+    const reportDate = String(entry.date ?? "");
+    if (!reportPath || !reportDate) {
+      continue;
+    }
+
+    if (!fileExists(reportPath)) {
+      warn(`Standards trend gate: history entry report is missing '${reportPath}'`);
+      continue;
+    }
+
+    let snapshot;
+    try {
+      snapshot = readJson(reportPath);
+    } catch {
+      warn(`Standards trend gate: unable to parse history entry report '${reportPath}'`);
+      continue;
+    }
+
+    const warningsInSnapshot = Array.isArray(snapshot.warnings) ? snapshot.warnings : [];
+    const failuresInSnapshot = Array.isArray(snapshot.failures) ? snapshot.failures : [];
+
+    for (const warningMessage of warningsInSnapshot) {
+      const normalized = normalizeFindingMessage(warningMessage);
+      if (!normalized || isTrendSyntheticMessage(normalized)) {
+        continue;
+      }
+
+      const existing = warningSignals.get(normalized);
+      if (!existing) {
+        warningSignals.set(normalized, { message: normalized, count: 1, lastSeenDate: reportDate });
+      } else {
+        existing.count += 1;
+        if (reportDate > existing.lastSeenDate) {
+          existing.lastSeenDate = reportDate;
+        }
+      }
+    }
+
+    for (const failureMessage of failuresInSnapshot) {
+      const normalized = normalizeFindingMessage(failureMessage);
+      if (!normalized || isTrendSyntheticMessage(normalized)) {
+        continue;
+      }
+
+      const existing = failureSignals.get(normalized);
+      if (!existing) {
+        failureSignals.set(normalized, { message: normalized, count: 1, lastSeenDate: reportDate });
+      } else {
+        existing.count += 1;
+        if (reportDate > existing.lastSeenDate) {
+          existing.lastSeenDate = reportDate;
+        }
+      }
+    }
+  }
+
+  return {
+    entries,
+    warningSignals,
+    failureSignals
+  };
+}
+
+function selectSignals(signalMap, threshold, maxSignals) {
+  return [...signalMap.values()]
+    .filter((signal) => signal.count >= threshold)
+    .sort((a, b) => {
+      if (a.count === b.count) {
+        if (a.lastSeenDate === b.lastSeenDate) {
+          return a.message.localeCompare(b.message);
+        }
+
+        return b.lastSeenDate.localeCompare(a.lastSeenDate);
+      }
+
+      return b.count - a.count;
+    })
+    .slice(0, maxSignals);
+}
+
+function buildTrendResolutionSteps(warningSignals, failureSignals) {
+  const rawSteps = [];
+
+  if (warningSignals.length === 0 && failureSignals.length === 0) {
+    return [];
+  }
+
+  rawSteps.push("Review repeated standards drift signals and fix the root cause before adding new changes.");
+
+  for (const signal of failureSignals) {
+    rawSteps.push(`Resolve repeated failure signal (${signal.count}x): ${signal.message}`);
+  }
+
+  for (const signal of warningSignals) {
+    rawSteps.push(`Resolve repeated warning signal (${signal.count}x): ${signal.message}`);
+  }
+
+  rawSteps.push("Re-run `pnpm standards:check` after each fix and confirm trend counts drop below threshold.");
+  rawSteps.push(
+    "If the standard changed intentionally, update docs/strategy/team-standards-contract.json and ADR 0008 in the same PR."
+  );
+
+  return uniquePreserveOrder(rawSteps).slice(0, 12);
+}
+
+function applyTrendGate(historyResult) {
+  const trendConfig = contract.trendGate ?? {};
+  const historyEntries = Array.isArray(historyResult?.historyIndex?.entries)
+    ? historyResult.historyIndex.entries
+    : [];
+
+  const windowEntries = Math.max(1, Number(trendConfig.windowEntries ?? 14));
+  const warningThreshold = Math.max(1, Number(trendConfig.warningThreshold ?? 3));
+  const failureThreshold = Math.max(1, Number(trendConfig.failureThreshold ?? 2));
+  const maxSignals = Math.max(1, Number(trendConfig.maxSignals ?? 8));
+  const blockOnFailureTrends = Boolean(trendConfig.blockOnFailureTrends ?? true);
+
+  const signalSet = collectTrendSignals(historyEntries, windowEntries);
+  const repeatedWarnings = selectSignals(signalSet.warningSignals, warningThreshold, maxSignals);
+  const repeatedFailures = selectSignals(signalSet.failureSignals, failureThreshold, maxSignals);
+  const harnessResolutionSteps = buildTrendResolutionSteps(repeatedWarnings, repeatedFailures);
+  const promptSection = buildHarnessResolutionPromptSection(harnessResolutionSteps);
+
+  trendState.windowEntries = signalSet.entries.length;
+  trendState.warningSignals = repeatedWarnings;
+  trendState.failureSignals = repeatedFailures;
+  trendState.harnessResolutionSteps = harnessResolutionSteps;
+  trendState.promptSection = promptSection;
+
+  if (repeatedWarnings.length === 0 && repeatedFailures.length === 0) {
+    pass(`Standards trend gate: no repeated warning/failure signals in last ${signalSet.entries.length} entries`);
+  } else {
+    if (repeatedWarnings.length > 0) {
+      warn(
+        `Standards trend gate: detected ${repeatedWarnings.length} repeated warning signal(s) in last ${signalSet.entries.length} entries`
+      );
+    }
+
+    if (repeatedFailures.length > 0) {
+      const message = `Standards trend gate: detected ${repeatedFailures.length} repeated failure signal(s) in last ${signalSet.entries.length} entries`;
+      if (blockOnFailureTrends) {
+        fail(message);
+      } else {
+        warn(message);
+      }
+    }
+  }
+
+  return {
+    windowEntries: signalSet.entries.length,
+    warningThreshold,
+    failureThreshold,
+    warningSignals: repeatedWarnings,
+    failureSignals: repeatedFailures,
+    harnessResolutionSteps,
+    promptSection
+  };
+}
+
+function writeTrendRemediationReport(trendResult) {
+  const trendConfig = contract.trendGate ?? {};
+  const remediationReportPath = trendConfig.remediationReportPath;
+
+  if (typeof remediationReportPath !== "string" || remediationReportPath.length === 0) {
+    return;
+  }
+
+  const remediationReport = {
+    version: Number(contract.report?.version ?? 1),
+    generatedBy: "scripts/standards-encoding-check.mjs",
+    trackedAt: new Date().toISOString(),
+    windowEntries: trendResult.windowEntries,
+    thresholds: {
+      warningThreshold: trendResult.warningThreshold,
+      failureThreshold: trendResult.failureThreshold
+    },
+    trends: [
+      ...trendResult.failureSignals.map((signal) => ({
+        severity: "failure",
+        message: signal.message,
+        count: signal.count,
+        lastSeenDate: signal.lastSeenDate
+      })),
+      ...trendResult.warningSignals.map((signal) => ({
+        severity: "warning",
+        message: signal.message,
+        count: signal.count,
+        lastSeenDate: signal.lastSeenDate
+      }))
+    ],
+    harnessResolutionSteps: trendResult.harnessResolutionSteps,
+    promptSection: trendResult.promptSection
+  };
+
+  for (const key of trendConfig.requiredRemediationTopLevelKeys ?? []) {
+    if (!(key in remediationReport)) {
+      fail(`Standards trend gate: remediation report is missing top-level key '${key}'`);
+    }
+  }
+
+  const absoluteReportPath = resolve(remediationReportPath);
+  fs.mkdirSync(path.dirname(absoluteReportPath), { recursive: true });
+  fs.writeFileSync(absoluteReportPath, `${JSON.stringify(remediationReport, null, 2)}\n`, "utf8");
+  pass(`Updated standards remediation report: ${remediationReportPath}`);
+}
+
+function syncHistorySnapshotWithFinalReport(historyResult) {
+  if (!historyResult || typeof historyResult !== "object") {
+    return;
+  }
+
+  const historyDir = String(historyResult.historyDir ?? "");
+  const historyIndexPath = String(historyResult.historyIndexPath ?? "");
+  const historyEntries = Array.isArray(historyResult.historyIndex?.entries) ? historyResult.historyIndex.entries : [];
+
+  if (!historyDir || !historyIndexPath || historyEntries.length === 0) {
+    return;
+  }
+
+  const today = formatIsoDate(new Date());
+  const snapshotRelativePath = `${historyDir}/${today}.json`;
+  const snapshotAbsolutePath = resolve(snapshotRelativePath);
+  const finalSnapshot = {
+    ...buildReport(),
+    historyDate: today
+  };
+  fs.mkdirSync(path.dirname(snapshotAbsolutePath), { recursive: true });
+  fs.writeFileSync(snapshotAbsolutePath, `${JSON.stringify(finalSnapshot, null, 2)}\n`, "utf8");
+
+  const updatedEntries = historyEntries.map((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+
+    if (String(entry.date ?? "") !== today) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      path: snapshotRelativePath,
+      status: finalSnapshot.status,
+      currentPhase: finalSnapshot.currentPhase,
+      counts: finalSnapshot.counts
+    };
+  });
+
+  const updatedIndex = {
+    ...historyResult.historyIndex,
+    entries: updatedEntries
+  };
+  const absoluteHistoryIndexPath = resolve(historyIndexPath);
+  fs.mkdirSync(path.dirname(absoluteHistoryIndexPath), { recursive: true });
+  fs.writeFileSync(absoluteHistoryIndexPath, `${JSON.stringify(updatedIndex, null, 2)}\n`, "utf8");
 }
 
 for (const requiredPath of contract.requiredFiles ?? []) {
@@ -662,7 +984,10 @@ if (fileExists(agentsPath)) {
 }
 
 writeLatestReport();
-writeHistoryReport();
+const historyResult = writeHistoryReport();
+const trendResult = applyTrendGate(historyResult);
+writeTrendRemediationReport(trendResult);
+syncHistorySnapshotWithFinalReport(historyResult);
 writeLatestReport();
 
 console.log("");

@@ -4,10 +4,16 @@
   "currentPhase": "phase-2.6",
   "status": "pass",
   "counts": {
-    "passes": 109,
+    "passes": 112,
     "warnings": 0,
     "failures": 0
   },
+  "trendSummary": {
+    "windowEntries": 1,
+    "warningSignals": [],
+    "failureSignals": []
+  },
+  "harnessResolutionSteps": [],
   "failures": [],
   "warnings": [],
   "passes": [
@@ -71,6 +77,7 @@
     "Standards README includes mention '`calibration.md`'",
     "Standards README includes mention '`har-rule-coverage.json`'",
     "Standards README includes mention '`har-rule-examples.json`'",
+    "Standards README includes mention '`reports/remediation.json`'",
     "Standards README includes mention 'pnpm standards:check'",
     "Calibration file includes heading '# Team Standards Calibration'",
     "Calibration file includes heading '## Cadence'",
@@ -119,6 +126,8 @@
     "Docs index includes Team Standards section",
     "AGENTS.md points to team standards index",
     "Wrote standards history snapshot: docs/team-standards/reports/history/2026-04-05.json",
-    "Updated standards history index: docs/team-standards/reports/history/index.json"
+    "Updated standards history index: docs/team-standards/reports/history/index.json",
+    "Standards trend gate: no repeated warning/failure signals in last 1 entries",
+    "Updated standards remediation report: docs/team-standards/reports/remediation.json"
   ]
 }

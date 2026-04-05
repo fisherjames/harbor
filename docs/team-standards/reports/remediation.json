@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/standards-encoding-check.mjs",
+  "trackedAt": "2026-04-05T17:54:56.059Z",
+  "windowEntries": 1,
+  "thresholds": {
+    "warningThreshold": 3,
+    "failureThreshold": 2
+  },
+  "trends": [],
+  "harnessResolutionSteps": [],
+  "promptSection": ""
+}

@@ -54,6 +54,7 @@
       "`calibration.md`",
       "`har-rule-coverage.json`",
       "`har-rule-examples.json`",
+      "`reports/remediation.json`",
       "pnpm standards:check"
     ]
   },
@@ -110,6 +111,8 @@
       "currentPhase",
       "status",
       "counts",
+      "trendSummary",
+      "harnessResolutionSteps",
       "failures",
       "warnings",
       "passes"
@@ -124,5 +127,23 @@
       "maxEntries": 60,
       "maxAgeDays": 120
     }
+  },
+  "trendGate": {
+    "windowEntries": 14,
+    "warningThreshold": 3,
+    "failureThreshold": 2,
+    "maxSignals": 8,
+    "blockOnFailureTrends": true,
+    "remediationReportPath": "docs/team-standards/reports/remediation.json",
+    "requiredRemediationTopLevelKeys": [
+      "version",
+      "generatedBy",
+      "trackedAt",
+      "windowEntries",
+      "thresholds",
+      "trends",
+      "harnessResolutionSteps",
+      "promptSection"
+    ]
   }
 }

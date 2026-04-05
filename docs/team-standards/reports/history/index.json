@@ -12,7 +12,7 @@
       "status": "pass",
       "currentPhase": "phase-2.6",
       "counts": {
-        "passes": 107,
+        "passes": 112,
         "warnings": 0,
         "failures": 0
       }

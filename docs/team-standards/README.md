@@ -15,6 +15,7 @@ These files encode Harbor's tacit team standards into executable, versioned arti
 - `review.md`: standards for structured pull request review.
 - `har-rule-coverage.json`: standards-to-HAR rule coverage matrix and template target mapping.
 - `har-rule-examples.json`: known-good HAR rule examples tied to concrete files/tests.
+- `reports/remediation.json`: repeated drift trend signals + auto-generated `## Harness Resolution Steps` prompt section.
 
 ## Calibration
 - `calibration.md` tracks lightweight alignment cadence and change criteria.
@@ -23,3 +24,4 @@ These files encode Harbor's tacit team standards into executable, versioned arti
 - `pnpm standards:check` validates instruction anatomy and scope limits.
 - `pnpm standards:check` updates `docs/team-standards/reports/latest.json` with the latest drift report.
 - `pnpm standards:check` maintains rolling history under `docs/team-standards/reports/history` with retention policy.
+- `pnpm standards:check` analyzes repeated warning/failure trends and updates `docs/team-standards/reports/remediation.json`.

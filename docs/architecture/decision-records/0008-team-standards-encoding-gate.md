@@ -14,10 +14,13 @@ As Harbor scales, tacit review expectations risk becoming inconsistent across en
   - required headings and severity categories,
   - explicit scope boundaries,
   - calibration history presence,
-  - prohibition of global rules/skills references.
+  - prohibition of global rules/skills references,
+  - rolling history trend detection for repeated warning/failure signals.
 - Include standards drift validation in the root `pnpm check` chain and docs cadence requirements.
+- Generate `docs/team-standards/reports/remediation.json` with an auto-built `## Harness Resolution Steps` section for repeated drift trends.
 
 ## Consequences
 - Team guidance becomes executable and consistently reusable by humans and agents.
 - Standards updates now require small ongoing maintenance and calibration entries.
 - Drift from project-scoped, enforceable instructions is caught before merge.
+- Repeated drift patterns are surfaced early with machine-readable remediation prompts before they become chronic.

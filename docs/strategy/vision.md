@@ -26,7 +26,7 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Run isolation policy: every run is worktree-bound and can boot the whole stack in isolation.
 - Observability policy: each run owns an ephemeral observability envelope with explicit retention.
 - Legibility policy: repository structure and naming conventions are enforced by an automated drift gate.
-- Team standards policy: engineering standards are encoded as project-scoped instruction files with an automated drift gate.
+- Team standards policy: engineering standards are encoded as project-scoped instruction files with an automated drift gate and repeated-drift trend remediation.
 - Enterprise baseline: SOC2 readiness, SAML, SCIM, immutable audit trail.
 
 ## Phase Targets
@@ -51,4 +51,5 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Repository entry docs and workspace README maps must stay synchronized and pass legibility drift checks.
 - Repository legibility map JSON must stay synchronized with workspace entrypoints and pass drift checks.
 - Team standards instruction files and calibration history must stay synchronized and pass standards drift checks.
+- Repeated standards warnings/failures must emit machine-readable remediation steps under `## Harness Resolution Steps`.
 - New behavior includes success-path and failure-path tests.
