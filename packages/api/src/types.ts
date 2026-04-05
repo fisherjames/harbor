@@ -62,3 +62,40 @@ export interface EscalateRunOutput {
   status: "needs_human";
   updatedAt: string;
 }
+
+export type WorkflowVersionState = "draft" | "published";
+
+export interface WorkflowVersionSummary {
+  workflowId: string;
+  version: number;
+  state: WorkflowVersionState;
+  savedAt: string;
+  savedBy: string;
+}
+
+export interface SaveWorkflowVersionInput {
+  workflow: WorkflowDefinition;
+  state?: WorkflowVersionState | undefined;
+}
+
+export interface SaveWorkflowVersionOutput extends WorkflowVersionSummary {
+  lintFindings: LintFinding[];
+  blocked: boolean;
+}
+
+export interface ListWorkflowVersionsInput {
+  workflowId: string;
+}
+
+export interface PublishWorkflowVersionInput {
+  workflowId: string;
+  version: number;
+}
+
+export interface PublishWorkflowVersionOutput {
+  workflowId: string;
+  version: number;
+  state: "published";
+  lintFindings: LintFinding[];
+  blocked: boolean;
+}

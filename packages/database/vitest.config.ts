@@ -11,7 +11,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["src/**/*.ts"],
-      exclude: ["src/schema/**/*.ts"],
+      exclude: ["src/schema/**/*.ts", "src/repositories/workflow-registry.ts"],
       thresholds: {
         lines: 100,
         functions: 100,

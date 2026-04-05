@@ -7,8 +7,11 @@ import type {
   DeployWorkflowOutput,
   HarborApiContext,
   ListRunsInput,
+  PublishWorkflowVersionOutput,
   RunDetail,
-  RunSummary
+  RunSummary,
+  SaveWorkflowVersionOutput,
+  WorkflowVersionSummary
 } from "./types.js";
 
 const memoryPolicySchema = z.object({
@@ -57,6 +60,22 @@ const runInputSchema = z.object({
   input: z.record(z.unknown())
 });
 
+const workflowVersionStateSchema = z.enum(["draft", "published"]);
+
+const saveWorkflowVersionInputSchema = z.object({
+  workflow: workflowSchema,
+  state: workflowVersionStateSchema.optional()
+});
+
+const listWorkflowVersionsInputSchema = z.object({
+  workflowId: z.string().min(1)
+});
+
+const publishWorkflowVersionInputSchema = z.object({
+  workflowId: z.string().min(1),
+  version: z.number().int().min(1)
+});
+
 const listRunsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
   status: z.enum(["queued", "running", "needs_human", "failed", "completed"]).optional(),
@@ -87,6 +106,26 @@ export interface HarborApiDependencies {
     status: RunStatus;
     updatedAt: string;
   } | null>;
+  saveWorkflowVersion(
+    context: HarborApiContext,
+    input: {
+      workflow: WorkflowDefinition;
+      state: "draft" | "published";
+    }
+  ): Promise<WorkflowVersionSummary>;
+  listWorkflowVersions(context: HarborApiContext, workflowId: string): Promise<WorkflowVersionSummary[]>;
+  getWorkflowVersion(
+    context: HarborApiContext,
+    workflowId: string,
+    version: number
+  ): Promise<(WorkflowVersionSummary & { workflow: WorkflowDefinition }) | null>;
+  publishWorkflowVersion(
+    context: HarborApiContext,
+    input: {
+      workflowId: string;
+      version: number;
+    }
+  ): Promise<WorkflowVersionSummary | null>;
 }
 
 const t = initTRPC.context<HarborApiContext>().create();
@@ -114,6 +153,27 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
       };
     }),
 
+    saveWorkflowVersion: authzProcedure
+      .input(saveWorkflowVersionInputSchema)
+      .mutation(async ({ ctx, input }): Promise<SaveWorkflowVersionOutput> => {
+        const state = input.state ?? "draft";
+        const lint = runLintAtExecutionPoint("save", input.workflow);
+        const saved = await dependencies.saveWorkflowVersion(ctx, {
+          workflow: input.workflow,
+          state
+        });
+
+        return {
+          workflowId: saved.workflowId,
+          version: saved.version,
+          state: saved.state,
+          savedAt: saved.savedAt,
+          savedBy: saved.savedBy,
+          lintFindings: lint.report.findings,
+          blocked: lint.report.blocked
+        };
+      }),
+
     deployWorkflow: authzProcedure.input(deployInputSchema).mutation(({ input }): DeployWorkflowOutput => {
       if (input.workflow.id !== input.workflowId) {
         throw new TRPCError({
@@ -137,6 +197,55 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
         blocked: lint.report.blocked
       };
     }),
+
+    listWorkflowVersions: authzProcedure
+      .input(listWorkflowVersionsInputSchema)
+      .query(async ({ ctx, input }) => {
+        return dependencies.listWorkflowVersions(ctx, input.workflowId);
+      }),
+
+    publishWorkflowVersion: authzProcedure
+      .input(publishWorkflowVersionInputSchema)
+      .mutation(async ({ ctx, input }): Promise<PublishWorkflowVersionOutput> => {
+        const version = await dependencies.getWorkflowVersion(ctx, input.workflowId, input.version);
+        if (!version) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Workflow version not found"
+          });
+        }
+
+        const lint = runLintAtExecutionPoint("deploy", version.workflow);
+        if (lint.report.blocked) {
+          return {
+            workflowId: input.workflowId,
+            version: input.version,
+            state: "published",
+            lintFindings: lint.report.findings,
+            blocked: true
+          };
+        }
+
+        const published = await dependencies.publishWorkflowVersion(ctx, {
+          workflowId: input.workflowId,
+          version: input.version
+        });
+
+        if (!published) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Workflow version not found"
+          });
+        }
+
+        return {
+          workflowId: published.workflowId,
+          version: published.version,
+          state: "published",
+          lintFindings: lint.report.findings,
+          blocked: false
+        };
+      }),
 
     runWorkflow: authzProcedure.input(runInputSchema).mutation(async ({ ctx, input }) => {
       const runRequest: WorkflowRunRequest = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertTenantScope,
+  InMemoryWorkflowRegistry,
   InMemoryRunPersistence,
   PostgresRunPersistence,
   createPostgresRunPersistence
@@ -510,5 +511,152 @@ describe("PostgresRunPersistence", () => {
     expect(usage.inputTokens).toBe(100);
     expect(usage.outputTokens).toBe(40);
     expect(usage.totalTokens).toBe(140);
+  });
+});
+
+describe("InMemoryWorkflowRegistry", () => {
+  const scope = {
+    tenantId: "tenant_1",
+    workspaceId: "workspace_1"
+  };
+
+  const alternateScope = {
+    tenantId: "tenant_2",
+    workspaceId: "workspace_2"
+  };
+
+  const workflowV1 = {
+    ...workflow,
+    id: "wf_registry",
+    version: 1
+  };
+
+  const workflowV2 = {
+    ...workflow,
+    id: "wf_registry",
+    version: 2
+  };
+
+  it("saves, lists, and gets versions in descending order", async () => {
+    const registry = new InMemoryWorkflowRegistry();
+
+    const savedV1 = await registry.saveVersion(scope, {
+      workflow: workflowV1,
+      actorId: "user_1"
+    });
+    const savedV2 = await registry.saveVersion(scope, {
+      workflow: workflowV2,
+      actorId: "user_2"
+    });
+
+    expect(savedV1.state).toBe("draft");
+    expect(savedV2.state).toBe("draft");
+
+    const versions = await registry.listVersions(scope, workflowV1.id);
+    expect(versions.map((record) => record.version)).toEqual([2, 1]);
+
+    const v1 = await registry.getVersion(scope, workflowV1.id, 1);
+    expect(v1?.savedBy).toBe("user_1");
+  });
+
+  it("updates existing version records and preserves isolation by scope", async () => {
+    const registry = new InMemoryWorkflowRegistry();
+
+    await registry.saveVersion(scope, {
+      workflow: workflowV1,
+      actorId: "user_1"
+    });
+    await registry.saveVersion(alternateScope, {
+      workflow: workflowV1,
+      actorId: "other_user"
+    });
+
+    const updated = await registry.saveVersion(scope, {
+      workflow: {
+        ...workflowV1,
+        name: "Updated Name"
+      },
+      actorId: "user_2",
+      state: "published"
+    });
+
+    expect(updated.savedBy).toBe("user_2");
+    expect(updated.state).toBe("published");
+    expect(updated.workflow.name).toBe("Updated Name");
+
+    const primary = await registry.getVersion(scope, workflowV1.id, 1);
+    const isolated = await registry.getVersion(alternateScope, workflowV1.id, 1);
+    expect(primary?.savedBy).toBe("user_2");
+    expect(isolated?.savedBy).toBe("other_user");
+  });
+
+  it("publishes a target version and demotes others to draft", async () => {
+    const registry = new InMemoryWorkflowRegistry();
+
+    await registry.saveVersion(scope, {
+      workflow: workflowV1,
+      actorId: "user_1"
+    });
+    await registry.saveVersion(scope, {
+      workflow: workflowV2,
+      actorId: "user_2"
+    });
+
+    const published = await registry.publishVersion(scope, {
+      workflowId: workflowV1.id,
+      version: 2,
+      actorId: "publisher"
+    });
+
+    expect(published?.state).toBe("published");
+    expect(published?.savedBy).toBe("publisher");
+
+    const versions = await registry.listVersions(scope, workflowV1.id);
+    expect(versions.find((record) => record.version === 2)?.state).toBe("published");
+    expect(versions.find((record) => record.version === 1)?.state).toBe("draft");
+  });
+
+  it("returns null/empty for missing state and missing versions", async () => {
+    const registry = new InMemoryWorkflowRegistry();
+
+    const missingList = await registry.listVersions(scope, "missing");
+    const missingGet = await registry.getVersion(scope, "missing", 1);
+    const missingPublishNoState = await registry.publishVersion(scope, {
+      workflowId: "missing",
+      version: 1,
+      actorId: "u"
+    });
+
+    await registry.saveVersion(scope, {
+      workflow: workflowV1,
+      actorId: "user_1"
+    });
+    const missingPublishNoVersion = await registry.publishVersion(scope, {
+      workflowId: workflowV1.id,
+      version: 99,
+      actorId: "u"
+    });
+    const missingGetVersion = await registry.getVersion(scope, workflowV1.id, 99);
+
+    expect(missingList).toEqual([]);
+    expect(missingGet).toBeNull();
+    expect(missingPublishNoState).toBeNull();
+    expect(missingPublishNoVersion).toBeNull();
+    expect(missingGetVersion).toBeNull();
+  });
+
+  it("returns cloned records so callers cannot mutate stored state", async () => {
+    const registry = new InMemoryWorkflowRegistry();
+
+    const saved = await registry.saveVersion(scope, {
+      workflow: workflowV1,
+      actorId: "user_1"
+    });
+    saved.workflow.name = "Mutated by caller";
+    saved.state = "published";
+
+    const listed = await registry.listVersions(scope, workflowV1.id);
+    expect(listed[0]?.workflow.name).toBe(workflowV1.name);
+    expect(listed[0]?.state).toBe("draft");
   });
 });

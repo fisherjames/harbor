@@ -24,6 +24,30 @@ describe("web server caller", () => {
     const save = await caller.saveWorkflow({ workflow: sampleWorkflow });
     expect(save.blocked).toBe(false);
 
+    const savedVersion = await caller.saveWorkflowVersion({ workflow: sampleWorkflow });
+    expect(savedVersion.state).toBe("draft");
+
+    const versions = await caller.listWorkflowVersions({
+      workflowId: sampleWorkflow.id
+    });
+    expect(versions.length).toBeGreaterThan(0);
+
+    await expect(
+      caller.publishWorkflowVersion({
+        workflowId: sampleWorkflow.id,
+        version: 999
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+
+    const published = await caller.publishWorkflowVersion({
+      workflowId: sampleWorkflow.id,
+      version: sampleWorkflow.version
+    });
+    expect(published.blocked).toBe(false);
+    expect(published.state).toBe("published");
+
     const run = await caller.runWorkflow({
       workflow: sampleWorkflow,
       trigger: "manual",

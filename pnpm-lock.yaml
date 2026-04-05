@@ -44,6 +44,9 @@ importers:
       '@harbor/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@harbor/harness':
+        specifier: workspace:*
+        version: link:../../packages/harness
       '@harbor/memu':
         specifier: workspace:*
         version: link:../../packages/memu

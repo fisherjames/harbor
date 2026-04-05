@@ -100,6 +100,45 @@ function createRouter(overrides?: Partial<HarborApiDependencies>) {
         updatedAt: new Date("2026-01-01T00:02:00.000Z").toISOString()
       };
     },
+    async saveWorkflowVersion(_context, input) {
+      return {
+        workflowId: input.workflow.id,
+        version: input.workflow.version,
+        state: input.state,
+        savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        savedBy: "user_1"
+      };
+    },
+    async listWorkflowVersions() {
+      return [
+        {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        }
+      ];
+    },
+    async getWorkflowVersion() {
+      return {
+        workflowId: "wf_1",
+        version: 1,
+        state: "draft",
+        savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        savedBy: "user_1",
+        workflow
+      };
+    },
+    async publishWorkflowVersion() {
+      return {
+        workflowId: "wf_1",
+        version: 1,
+        state: "published",
+        savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        savedBy: "user_1"
+      };
+    },
     ...overrides
   };
 
@@ -127,6 +166,45 @@ describe("createHarborRouter", () => {
     const caller = router.createCaller(scopedContext);
 
     const result = await caller.saveWorkflow({
+      workflow: {
+        ...workflow,
+        nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+      }
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.lintFindings.some((finding) => finding.ruleId === "HAR001")).toBe(true);
+  });
+
+  it("saves workflow versions and defaults state to draft", async () => {
+    const calls: Array<{ state: "draft" | "published" }> = [];
+    const router = createRouter({
+      async saveWorkflowVersion(_context, input) {
+        calls.push({ state: input.state });
+        return {
+          workflowId: input.workflow.id,
+          version: input.workflow.version,
+          state: input.state,
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.saveWorkflowVersion({ workflow });
+
+    expect(calls[0]?.state).toBe("draft");
+    expect(result.workflowId).toBe(workflow.id);
+    expect(result.state).toBe("draft");
+    expect(result.blocked).toBe(false);
+  });
+
+  it("returns lint findings for saved workflow versions", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.saveWorkflowVersion({
       workflow: {
         ...workflow,
         nodes: workflow.nodes.filter((node) => node.type !== "verifier")
@@ -175,6 +253,108 @@ describe("createHarborRouter", () => {
 
     expect(result.deploymentId).toContain("dep_");
     expect(result.blocked).toBe(false);
+  });
+
+  it("lists workflow versions", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const versions = await caller.listWorkflowVersions({
+      workflowId: workflow.id
+    });
+
+    expect(versions).toHaveLength(1);
+    expect(versions[0]?.workflowId).toBe(workflow.id);
+  });
+
+  it("blocks publish when deploy lint is critical", async () => {
+    const publishCalls: string[] = [];
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+          }
+        };
+      },
+      async publishWorkflowVersion(_context, input) {
+        publishCalls.push(`${input.workflowId}:${input.version}`);
+        return {
+          workflowId: input.workflowId,
+          version: input.version,
+          state: "published",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.lintFindings.some((finding) => finding.ruleId === "HAR001")).toBe(true);
+    expect(publishCalls).toHaveLength(0);
+  });
+
+  it("rejects publish for unknown version before lint", async () => {
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.publishWorkflowVersion({
+        workflowId: workflow.id,
+        version: workflow.version
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
+  it("rejects publish when dependency returns not found", async () => {
+    const router = createRouter({
+      async publishWorkflowVersion() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.publishWorkflowVersion({
+        workflowId: workflow.id,
+        version: workflow.version
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
+  it("publishes workflow version when lint passes", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const published = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(published.workflowId).toBe(workflow.id);
+    expect(published.version).toBe(workflow.version);
+    expect(published.state).toBe("published");
+    expect(published.blocked).toBe(false);
   });
 
   it("creates run request using scoped context", async () => {

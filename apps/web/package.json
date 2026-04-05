@@ -19,6 +19,7 @@
     "@harbor/api": "workspace:*",
     "@harbor/database": "workspace:*",
     "@harbor/engine": "workspace:*",
+    "@harbor/harness": "workspace:*",
     "@harbor/memu": "workspace:*",
     "@harbor/observability": "workspace:*",
     "@trpc/client": "^10.45.2",

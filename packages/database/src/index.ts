@@ -23,3 +23,12 @@ export type {
   RunEscalationResult,
   RunTokenUsage
 } from "./repositories/run-store.js";
+export { InMemoryWorkflowRegistry } from "./repositories/in-memory-workflow-registry.js";
+export type {
+  WorkflowRegistry,
+  WorkflowRegistryScope,
+  SaveWorkflowVersionInput,
+  PublishWorkflowVersionInput,
+  WorkflowVersionRecord,
+  WorkflowVersionState
+} from "./repositories/workflow-registry.js";
