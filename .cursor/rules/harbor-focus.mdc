@@ -1,0 +1,9 @@
+---
+description: Keep Harbor scoped, durable, and verifiable.
+alwaysApply: true
+---
+
+- Optimize for reliability over cleverness.
+- Enforce harness invariants before adding new features.
+- Avoid hidden side effects; keep all execution decisions traceable.
+- If uncertain, prefer explicit schema + validation over implicit behavior.

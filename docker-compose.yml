@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: harbor-postgres
+    environment:
+      POSTGRES_USER: harbor
+      POSTGRES_PASSWORD: harbor
+      POSTGRES_DB: harbor
+    ports:
+      - "5432:5432"
+    volumes:
+      - harbor-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: harbor-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - harbor-redis-data:/data
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: harbor-inngest
+    command: "inngest dev -u http://host.docker.internal:3000/api/inngest"
+    ports:
+      - "8288:8288"
+
+  memu-mock:
+    image: wiremock/wiremock:latest
+    container_name: harbor-memu-mock
+    ports:
+      - "8081:8080"
+
+volumes:
+  harbor-postgres-data:
+  harbor-redis-data:

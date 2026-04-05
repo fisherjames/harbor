@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/memu" },
+    { "path": "./packages/harness" },
+    { "path": "./packages/engine" },
+    { "path": "./packages/database" },
+    { "path": "./packages/observability" },
+    { "path": "./packages/api" },
+    { "path": "./apps/worker" },
+    { "path": "./apps/web" }
+  ]
+}

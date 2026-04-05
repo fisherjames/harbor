@@ -1,0 +1,9 @@
+---
+description: Harness linter and remediation loop guardrails.
+alwaysApply: true
+---
+
+- Run lint rules on workflow save, deploy, and runtime pre-stage checks.
+- Block execution on critical findings.
+- For warning/info findings, inject resolution steps into `## Harness Resolution Steps`.
+- Ensure verifier stage checks each listed constraint.

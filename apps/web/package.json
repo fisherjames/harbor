@@ -1,0 +1,30 @@
+{
+  "name": "@harbor/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev -p 3000",
+    "start": "next start -p 3000",
+    "lint": "echo \"Web lint is enforced by typecheck and test coverage gates\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "clean": "rm -rf .next dist coverage"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.39.1",
+    "@harbor/api": "workspace:*",
+    "@harbor/database": "workspace:*",
+    "@harbor/engine": "workspace:*",
+    "@harbor/memu": "workspace:*",
+    "@harbor/observability": "workspace:*",
+    "@trpc/client": "^10.45.2",
+    "@trpc/server": "^10.45.2",
+    "next": "^15.2.9",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}

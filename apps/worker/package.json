@@ -1,0 +1,24 @@
+{
+  "name": "@harbor/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -w -p tsconfig.build.json",
+    "lint": "echo \"Worker lint is enforced by strict TS and runtime checks\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@harbor/database": "workspace:*",
+    "@harbor/engine": "workspace:*",
+    "@harbor/harness": "workspace:*",
+    "@harbor/memu": "workspace:*",
+    "@harbor/observability": "workspace:*",
+    "inngest": "^3.31.11"
+  }
+}
