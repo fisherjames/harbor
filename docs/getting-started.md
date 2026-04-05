@@ -2,13 +2,13 @@
 
 <!-- DOCS_CADENCE_METADATA_BEGIN -->
 {
-  "currentPhase": "phase-2.5",
+  "currentPhase": "phase-2.6",
   "harnessRules": ["HAR001", "HAR002", "HAR003", "HAR004", "HAR005"],
   "milestones": [
     { "id": "phase-1", "status": "complete", "docsVerified": true },
     { "id": "phase-2", "status": "complete", "docsVerified": true },
-    { "id": "phase-2.5", "status": "in_progress", "docsVerified": true },
-    { "id": "phase-2.6", "status": "planned", "docsVerified": false },
+    { "id": "phase-2.5", "status": "complete", "docsVerified": true },
+    { "id": "phase-2.6", "status": "in_progress", "docsVerified": true },
     { "id": "phase-3", "status": "planned", "docsVerified": false },
     { "id": "phase-4", "status": "planned", "docsVerified": false },
     { "id": "phase-5", "status": "planned", "docsVerified": false }
