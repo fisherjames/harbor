@@ -34,6 +34,10 @@ function parseIsoDate(input) {
   return parsed;
 }
 
+function formatIsoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 const failures = [];
 const warnings = [];
 const passes = [];
@@ -85,16 +89,9 @@ function computeStatus() {
   return "pass";
 }
 
-function writeReport() {
-  const reportConfig = contract.report ?? {};
-  const reportPath = reportConfig.path;
-
-  if (typeof reportPath !== "string" || reportPath.length === 0) {
-    return;
-  }
-
-  const report = {
-    version: Number(reportConfig.version ?? 1),
+function buildReport() {
+  return {
+    version: Number(contract.report?.version ?? 1),
     generatedBy: "scripts/standards-encoding-check.mjs",
     currentPhase: readCurrentPhase(),
     status: computeStatus(),
@@ -107,6 +104,17 @@ function writeReport() {
     warnings: [...warnings],
     passes: [...passes]
   };
+}
+
+function writeLatestReport() {
+  const reportConfig = contract.report ?? {};
+  const reportPath = reportConfig.path;
+
+  if (typeof reportPath !== "string" || reportPath.length === 0) {
+    return;
+  }
+
+  const report = buildReport();
 
   for (const key of reportConfig.requiredTopLevelKeys ?? []) {
     if (!(key in report)) {
@@ -118,6 +126,153 @@ function writeReport() {
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   fs.mkdirSync(path.dirname(absoluteReportPath), { recursive: true });
   fs.writeFileSync(absoluteReportPath, serialized, "utf8");
+}
+
+function writeHistoryReport() {
+  const reportConfig = contract.report ?? {};
+  const historyDir = reportConfig.historyDir;
+  const historyIndexPath = reportConfig.historyIndexPath;
+
+  if (
+    typeof historyDir !== "string" ||
+    historyDir.length === 0 ||
+    typeof historyIndexPath !== "string" ||
+    historyIndexPath.length === 0
+  ) {
+    return;
+  }
+
+  const retention = reportConfig.retention ?? {};
+  const maxEntries = Math.max(1, Number(retention.maxEntries ?? 60));
+  const maxAgeDays = Math.max(1, Number(retention.maxAgeDays ?? 120));
+
+  const now = new Date();
+  const today = formatIsoDate(now);
+  const snapshotRelativePath = `${historyDir}/${today}.json`;
+  const snapshotAbsolutePath = resolve(snapshotRelativePath);
+  fs.mkdirSync(path.dirname(snapshotAbsolutePath), { recursive: true });
+
+  const snapshot = {
+    ...buildReport(),
+    historyDate: today
+  };
+  fs.writeFileSync(snapshotAbsolutePath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+  pass(`Wrote standards history snapshot: ${snapshotRelativePath}`);
+
+  let historyIndex = {
+    version: Number(reportConfig.version ?? 1),
+    generatedBy: "scripts/standards-encoding-check.mjs",
+    retention: {
+      maxEntries,
+      maxAgeDays
+    },
+    entries: []
+  };
+
+  if (fileExists(historyIndexPath)) {
+    try {
+      const parsed = readJson(historyIndexPath);
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.entries)) {
+        historyIndex = {
+          version: Number(parsed.version ?? reportConfig.version ?? 1),
+          generatedBy: String(parsed.generatedBy ?? "scripts/standards-encoding-check.mjs"),
+          retention: {
+            maxEntries: Number(parsed.retention?.maxEntries ?? maxEntries),
+            maxAgeDays: Number(parsed.retention?.maxAgeDays ?? maxAgeDays)
+          },
+          entries: parsed.entries
+        };
+      }
+    } catch {
+      fail(`Standards drift: unable to parse history index '${historyIndexPath}'`);
+    }
+  }
+
+  const currentEntry = {
+    date: today,
+    path: snapshotRelativePath,
+    status: snapshot.status,
+    currentPhase: snapshot.currentPhase,
+    counts: snapshot.counts
+  };
+
+  const filteredEntries = [];
+  for (const entry of historyIndex.entries) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const entryDate = parseIsoDate(String(entry.date ?? ""));
+    const entryPath = String(entry.path ?? "");
+    if (!entryDate || !entryPath) {
+      continue;
+    }
+
+    if (formatIsoDate(entryDate) === today) {
+      continue;
+    }
+
+    const ageDays = Math.floor((now.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (ageDays > maxAgeDays) {
+      continue;
+    }
+
+    filteredEntries.push({
+      date: formatIsoDate(entryDate),
+      path: entryPath,
+      status: String(entry.status ?? "unknown"),
+      currentPhase: String(entry.currentPhase ?? "unknown"),
+      counts: {
+        passes: Number(entry.counts?.passes ?? 0),
+        warnings: Number(entry.counts?.warnings ?? 0),
+        failures: Number(entry.counts?.failures ?? 0)
+      }
+    });
+  }
+
+  filteredEntries.push(currentEntry);
+  filteredEntries.sort((a, b) => b.date.localeCompare(a.date));
+  const retainedEntries = filteredEntries.slice(0, maxEntries);
+
+  const retainedPaths = new Set(retainedEntries.map((entry) => entry.path));
+  const absoluteHistoryDir = resolve(historyDir);
+  if (fs.existsSync(absoluteHistoryDir)) {
+    for (const entry of fs.readdirSync(absoluteHistoryDir, { withFileTypes: true })) {
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}\.json$/.test(entry.name)) {
+        continue;
+      }
+
+      const relativePath = `${historyDir}/${entry.name}`;
+      if (!retainedPaths.has(relativePath)) {
+        fs.rmSync(path.join(absoluteHistoryDir, entry.name), { force: true });
+      }
+    }
+  }
+
+  const finalIndex = {
+    version: Number(reportConfig.version ?? 1),
+    generatedBy: "scripts/standards-encoding-check.mjs",
+    retention: {
+      maxEntries,
+      maxAgeDays
+    },
+    entries: retainedEntries
+  };
+
+  for (const key of reportConfig.historyRequiredTopLevelKeys ?? []) {
+    if (!(key in finalIndex)) {
+      fail(`Standards drift: history index is missing top-level key '${key}'`);
+    }
+  }
+
+  const absoluteHistoryIndexPath = resolve(historyIndexPath);
+  fs.mkdirSync(path.dirname(absoluteHistoryIndexPath), { recursive: true });
+  fs.writeFileSync(absoluteHistoryIndexPath, `${JSON.stringify(finalIndex, null, 2)}\n`, "utf8");
+  pass(`Updated standards history index: ${historyIndexPath}`);
 }
 
 for (const requiredPath of contract.requiredFiles ?? []) {
@@ -506,7 +661,9 @@ if (fileExists(agentsPath)) {
   }
 }
 
-writeReport();
+writeLatestReport();
+writeHistoryReport();
+writeLatestReport();
 
 console.log("");
 console.log("Standards Encoding Check Summary");

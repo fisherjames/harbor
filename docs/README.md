@@ -24,6 +24,7 @@ This index is the canonical entrypoint for both humans and coding agents.
 - [`/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-coverage.json`](/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-coverage.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-examples.json`](/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-examples.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/team-standards/reports/latest.json`](/Users/james/Documents/GitHub/harbor/docs/team-standards/reports/latest.json)
+- [`/Users/james/Documents/GitHub/harbor/docs/team-standards/reports/history/index.json`](/Users/james/Documents/GitHub/harbor/docs/team-standards/reports/history/index.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json)
 
 ## Execution Plans

@@ -4,7 +4,7 @@
   "currentPhase": "phase-2.6",
   "status": "pass",
   "counts": {
-    "passes": 109,
+    "passes": 107,
     "warnings": 0,
     "failures": 0
   },
@@ -117,8 +117,7 @@
     "HAR examples pack includes required rule HAR004",
     "HAR examples pack includes required rule HAR005",
     "Docs index includes Team Standards section",
-    "AGENTS.md points to team standards index",
-    "Wrote standards history snapshot: docs/team-standards/reports/history/2026-04-05.json",
-    "Updated standards history index: docs/team-standards/reports/history/index.json"
-  ]
+    "AGENTS.md points to team standards index"
+  ],
+  "historyDate": "2026-04-05"
 }

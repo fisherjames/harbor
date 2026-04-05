@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/standards-encoding-check.mjs",
+  "retention": {
+    "maxEntries": 60,
+    "maxAgeDays": 120
+  },
+  "entries": [
+    {
+      "date": "2026-04-05",
+      "path": "docs/team-standards/reports/history/2026-04-05.json",
+      "status": "pass",
+      "currentPhase": "phase-2.6",
+      "counts": {
+        "passes": 107,
+        "warnings": 0,
+        "failures": 0
+      }
+    }
+  ]
+}
