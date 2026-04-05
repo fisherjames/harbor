@@ -16,7 +16,10 @@ Harbor is a standalone TypeScript agent orchestration platform with harness-firs
 - Prompt mutation is only allowed inside harness middleware.
 - memU writes must include category/path and retention-aware metadata.
 - API procedures must enforce `tenantId` and `workspaceId` scoping.
+- Runs must be worktree-bound and able to build/run the full stack in isolation.
+- Runs must emit to run-scoped ephemeral observability with explicit cleanup.
 
 ## Delivery Discipline
 - New behavior requires at least one success-path and one failure-path test.
 - Architectural decisions that change contracts must add/update an ADR in `docs/architecture/decision-records`.
+- When proposing run-runtime architecture, always include worktree isolation and ephemeral observability recommendations.

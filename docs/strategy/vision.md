@@ -6,9 +6,11 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 ## Product Promise
 - Build workflows visually and in code with typed contracts.
 - Execute with durable, staged orchestration (`plan -> execute -> verify -> fix`).
+- Execute each run inside its own isolated git worktree context.
 - Enforce safety and quality through harness lint and policy gates.
 - Preserve context and reduce token waste with memU-backed retrieval/writeback.
 - Support multi-tenant operation with strict tenancy boundaries and auditability.
+- Provide per-run ephemeral observability so traces/log pipelines are isolated and disposable by run.
 
 ## Locked Decisions
 - Durable runtime: Inngest first.
@@ -19,6 +21,8 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - memU posture: managed memU first, adapter-ready for self-host later.
 - Git integration scope: GitHub only for MVP/polished production.
 - Linter policy: block on critical, inject remediation steps for non-critical findings.
+- Run isolation policy: every run is worktree-bound and can boot the whole stack in isolation.
+- Observability policy: each run owns an ephemeral observability envelope with explicit retention.
 - Enterprise baseline: SOC2 readiness, SAML, SCIM, immutable audit trail.
 
 ## Phase Targets
@@ -35,4 +39,6 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Workflow nodes carry explicit ownership and execution budgets.
 - Tool-call nodes carry explicit tool scopes plus `toolCallPolicy` (`timeoutMs`, `retryLimit`, `maxCalls`).
 - memU writes include category/path and retention-aware metadata.
+- Every run binds to a dedicated worktree and can build/run the full stack without sharing mutable runtime state.
+- Every run emits to a run-scoped ephemeral observability channel with deterministic cleanup.
 - New behavior includes success-path and failure-path tests.

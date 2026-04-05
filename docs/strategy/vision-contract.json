@@ -16,7 +16,9 @@
     "authTenancy": "clerk_orgs",
     "apiContracts": "trpc_everywhere",
     "memoryPosture": "managed_memu_first",
-    "vcsIntegration": "github_only_mvp"
+    "vcsIntegration": "github_only_mvp",
+    "runIsolation": "worktree_bound_per_run",
+    "runObservability": "ephemeral_per_run"
   },
   "requiredHarnessRules": [
     "HAR001",
@@ -29,11 +31,15 @@
     "docs/architecture/decision-records/0001-harness-first-runtime.md",
     "docs/architecture/decision-records/0002-api-tenancy-boundaries.md",
     "docs/architecture/decision-records/0003-workflow-version-lifecycle.md",
-    "docs/architecture/decision-records/0004-tool-call-budget-policy.md"
+    "docs/architecture/decision-records/0004-tool-call-budget-policy.md",
+    "docs/architecture/decision-records/0005-run-worktree-isolation.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,
     "criticalLintBlocksDeploy": true,
-    "nonCriticalFindingsInjectResolutionSteps": true
+    "nonCriticalFindingsInjectResolutionSteps": true,
+    "worktreeBoundRuns": true,
+    "runCanBuildWholeStack": true,
+    "ephemeralObservabilityPerRun": true
   }
 }

@@ -56,6 +56,8 @@ if (!fileExists("docs/strategy/phase-tracker.json")) {
 
 const visionContract = readJson("docs/strategy/vision-contract.json");
 const phaseTracker = readJson("docs/strategy/phase-tracker.json");
+const visionDoc = readText("docs/strategy/vision.md");
+const normalizedVisionDoc = visionDoc.replace(/[^a-zA-Z0-9\s]/g, " ").toLowerCase();
 
 for (const workspacePath of visionContract.requiredWorkspaces ?? []) {
   if (!fileExists(workspacePath)) {
@@ -150,6 +152,42 @@ if (!agentsContract.includes("Use only repository-local rules and skills")) {
   fail("Project-scope drift: AGENTS.md no longer enforces repo-local rules/skills");
 } else {
   pass("AGENTS.md enforces repo-local rules/skills");
+}
+
+if (visionContract.requiredPolicies?.worktreeBoundRuns) {
+  if (!/worktree\s+bound/.test(normalizedVisionDoc)) {
+    fail("Vision drift: worktree-bound run policy missing from vision.md");
+  } else {
+    pass("Vision includes worktree-bound run policy");
+  }
+
+  if (!/worktree\s+bound/.test(normalizedAgentsContract)) {
+    fail("Project policy drift: AGENTS.md missing worktree-bound run invariant");
+  } else {
+    pass("AGENTS.md includes worktree-bound run invariant");
+  }
+}
+
+if (visionContract.requiredPolicies?.runCanBuildWholeStack) {
+  if (!/full\s+stack/.test(normalizedVisionDoc)) {
+    fail("Vision drift: full-stack run isolation policy missing from vision.md");
+  } else {
+    pass("Vision includes full-stack run isolation policy");
+  }
+}
+
+if (visionContract.requiredPolicies?.ephemeralObservabilityPerRun) {
+  if (!/ephemeral\s+observability/.test(normalizedVisionDoc)) {
+    fail("Vision drift: ephemeral observability policy missing from vision.md");
+  } else {
+    pass("Vision includes ephemeral observability policy");
+  }
+
+  if (!/ephemeral\s+observability/.test(normalizedAgentsContract)) {
+    fail("Project policy drift: AGENTS.md missing ephemeral observability invariant");
+  } else {
+    pass("AGENTS.md includes ephemeral observability invariant");
+  }
 }
 
 const validPhaseStatuses = new Set(["planned", "in_progress", "complete"]);
