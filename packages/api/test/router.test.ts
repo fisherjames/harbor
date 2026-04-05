@@ -389,6 +389,36 @@ describe("createHarborRouter", () => {
     expect(published.blocked).toBe(false);
   });
 
+  it("accepts typed tool policy fields in workflow input", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const toolWorkflow = {
+      ...workflow,
+      nodes: [
+        ...workflow.nodes,
+        {
+          id: "tool-node",
+          type: "tool_call" as const,
+          owner: "ops",
+          timeoutMs: 500,
+          retryLimit: 1,
+          toolPermissionScope: ["search"],
+          toolCallPolicy: {
+            timeoutMs: 600,
+            retryLimit: 1,
+            maxCalls: 2
+          }
+        }
+      ]
+    };
+
+    const save = await caller.saveWorkflowVersion({
+      workflow: toolWorkflow
+    });
+    expect(save.blocked).toBe(false);
+  });
+
   it("creates run request using scoped context", async () => {
     const calls: WorkflowRunRequest[] = [];
 

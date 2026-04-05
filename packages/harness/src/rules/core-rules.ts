@@ -13,6 +13,11 @@ export function applyCoreHarnessRules(workflow: WorkflowDefinition): LintFinding
     writebackEnabled: z.boolean(),
     piiRetention: z.enum(["forbidden", "redacted", "allowed"])
   });
+  const toolCallPolicySchema = z.object({
+    timeoutMs: z.number().int().positive(),
+    retryLimit: z.number().int().min(0),
+    maxCalls: z.number().int().min(1).max(1_000)
+  });
 
   const hasVerifier = workflow.nodes.some((node) => node.type === "verifier");
   if (!hasVerifier) {
@@ -56,6 +61,29 @@ export function applyCoreHarnessRules(workflow: WorkflowDefinition): LintFinding
           `Set explicit toolPermissionScope on node ${node.id}.`,
           "Deny all tools not explicitly listed in scope.",
           "Record denied tool attempts in trace logs."
+        ]
+      });
+    }
+
+    const toolPolicyValidation = toolCallPolicySchema.safeParse(node.toolCallPolicy);
+    if (!toolPolicyValidation.success) {
+      findings.push({
+        findingId: buildFindingId("HAR005", node.id),
+        ruleId: "HAR005",
+        severity: "warning",
+        message: `Tool node is missing or has invalid toolCallPolicy: ${toolPolicyValidation.error.issues
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          .join("; ")}`,
+        nodeId: node.id,
+        promptPatch: {
+          section: "tooling",
+          operation: "append",
+          content: `Declare timeoutMs, retryLimit, and maxCalls in toolCallPolicy for node ${node.id}.`
+        },
+        resolutionSteps: [
+          `Set toolCallPolicy.timeoutMs, retryLimit, and maxCalls on node ${node.id}.`,
+          "Cap tool invocations using maxCalls to prevent runaway loops.",
+          "Escalate to human after retry budget exhaustion for tool failures."
         ]
       });
     }

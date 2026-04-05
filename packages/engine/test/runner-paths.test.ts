@@ -183,6 +183,96 @@ describe("workflow runner paths", () => {
     expect(steps.filter((step) => step === "Escalate to human after retry budget exhaustion.")).toHaveLength(1);
   });
 
+  it("records tool execution policy artifact when tool nodes are present", async () => {
+    const model: ModelProvider = {
+      async generate({ stage }) {
+        return {
+          output: stage === "verify" ? "PASS" : "ok",
+          latencyMs: 1
+        };
+      }
+    };
+
+    const workflowWithTool: WorkflowDefinition = {
+      ...workflow,
+      nodes: [
+        ...workflow.nodes,
+        {
+          id: "tool-node",
+          type: "tool_call",
+          owner: "ops",
+          timeoutMs: 500,
+          retryLimit: 1,
+          toolPermissionScope: ["search"],
+          toolCallPolicy: {
+            timeoutMs: 500,
+            retryLimit: 1,
+            maxCalls: 2
+          }
+        }
+      ]
+    };
+
+    const persistence = new CapturePersistence();
+    const runner = createWorkflowRunner({ model, memu, tracer, persistence });
+    const result = await runner.runWorkflow(request, workflowWithTool);
+
+    expect(result.status).toBe("completed");
+    const rawPolicy = persistence.artifacts["tool-execution-policy"];
+    expect(rawPolicy).toBeDefined();
+
+    const policy = JSON.parse(rawPolicy ?? "[]") as Array<{ nodeId: string; maxCalls: number | null }>;
+    expect(policy[0]?.nodeId).toBe("tool-node");
+    expect(policy[0]?.maxCalls).toBe(2);
+  });
+
+  it("captures defaulted tool policy fields even when lint blocks the run", async () => {
+    const model: ModelProvider = {
+      async generate({ stage }) {
+        return {
+          output: stage === "verify" ? "PASS" : "ok",
+          latencyMs: 1
+        };
+      }
+    };
+
+    const blockedToolWorkflow: WorkflowDefinition = {
+      ...workflow,
+      nodes: [
+        ...workflow.nodes,
+        {
+          id: "unsafe-tool",
+          type: "tool_call",
+          owner: "ops",
+          timeoutMs: 500,
+          retryLimit: 1
+        }
+      ]
+    };
+
+    const persistence = new CapturePersistence();
+    const runner = createWorkflowRunner({ model, memu, tracer, persistence });
+    const result = await runner.runWorkflow(request, blockedToolWorkflow);
+
+    expect(result.status).toBe("failed");
+    const rawPolicy = persistence.artifacts["tool-execution-policy"];
+    expect(rawPolicy).toBeDefined();
+
+    const policy = JSON.parse(rawPolicy ?? "[]") as Array<{
+      nodeId: string;
+      scope: string[];
+      timeoutMs: number | null;
+      retryLimit: number | null;
+      maxCalls: number | null;
+    }>;
+
+    expect(policy[0]?.nodeId).toBe("unsafe-tool");
+    expect(policy[0]?.scope).toEqual([]);
+    expect(policy[0]?.timeoutMs).toBeNull();
+    expect(policy[0]?.retryLimit).toBeNull();
+    expect(policy[0]?.maxCalls).toBeNull();
+  });
+
   it("blocks runs without memory policy and skips memu reads/writes", async () => {
     let memuReadCalls = 0;
     let memuWriteCalls = 0;

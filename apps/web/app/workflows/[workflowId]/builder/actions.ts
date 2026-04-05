@@ -31,7 +31,14 @@ const workflowSchema = z.object({
         timeoutMs: z.number().int().positive(),
         retryLimit: z.number().int().min(0),
         promptTemplate: z.string().optional(),
-        toolPermissionScope: z.array(z.string()).optional()
+        toolPermissionScope: z.array(z.string()).optional(),
+        toolCallPolicy: z
+          .object({
+            timeoutMs: z.number().int().positive(),
+            retryLimit: z.number().int().min(0),
+            maxCalls: z.number().int().min(1)
+          })
+          .optional()
       })
     )
     .min(1)

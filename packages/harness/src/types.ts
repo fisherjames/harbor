@@ -25,6 +25,12 @@ export interface LintFinding {
 
 export type WorkflowNodeType = "planner" | "executor" | "verifier" | "memory_write" | "tool_call";
 
+export interface ToolCallPolicy {
+  timeoutMs: number;
+  retryLimit: number;
+  maxCalls: number;
+}
+
 export interface WorkflowNode {
   id: string;
   type: WorkflowNodeType;
@@ -34,6 +40,7 @@ export interface WorkflowNode {
   retryLimit?: number | undefined;
   promptTemplate?: string | undefined;
   toolPermissionScope?: string[] | undefined;
+  toolCallPolicy?: ToolCallPolicy | undefined;
 }
 
 export interface WorkflowDefinition {

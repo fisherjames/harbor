@@ -83,6 +83,50 @@ describe("lintWorkflowDefinition", () => {
     expect(report.blocked).toBe(true);
   });
 
+  it("adds warning when tool call policy is missing", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      nodes: [
+        ...baseWorkflow.nodes,
+        {
+          id: "tool",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["search"]
+        }
+      ]
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "HAR005" && f.severity === "warning")).toBe(true);
+    expect(report.blocked).toBe(false);
+  });
+
+  it("accepts valid tool call policy", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      nodes: [
+        ...baseWorkflow.nodes,
+        {
+          id: "tool",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["search"],
+          toolCallPolicy: {
+            timeoutMs: 800,
+            retryLimit: 2,
+            maxCalls: 3
+          }
+        }
+      ]
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "HAR005")).toBe(false);
+  });
+
   it("adds warning when node budgets are missing", () => {
     const report = lintWorkflowDefinition({
       ...baseWorkflow,
@@ -204,11 +248,13 @@ describe("lintWorkflowDefinition", () => {
     const recommendations = generateRemediationRecommendations({
       HAR001: { count: 1, latestVersion: 1 },
       HAR002: { count: 1, latestVersion: 1 },
+      HAR005: { count: 1, latestVersion: 1 },
       HAR004: { count: 1, latestVersion: 1 }
     });
 
     expect(recommendations.find((item) => item.ruleId === "HAR001")?.templateTarget).toBe("verification");
     expect(recommendations.find((item) => item.ruleId === "HAR002")?.templateTarget).toBe("tooling");
+    expect(recommendations.find((item) => item.ruleId === "HAR005")?.templateTarget).toBe("tooling");
     expect(recommendations.find((item) => item.ruleId === "HAR004")?.templateTarget).toBe("memory");
   });
 });

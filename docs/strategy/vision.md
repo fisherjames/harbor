@@ -33,5 +33,6 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Critical harness lint findings block deployment/publish.
 - Prompt mutations happen only through harness middleware pathways.
 - Workflow nodes carry explicit ownership and execution budgets.
+- Tool-call nodes carry explicit tool scopes plus `toolCallPolicy` (`timeoutMs`, `retryLimit`, `maxCalls`).
 - memU writes include category/path and retention-aware metadata.
 - New behavior includes success-path and failure-path tests.

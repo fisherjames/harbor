@@ -106,7 +106,17 @@ export function WorkflowBuilder({ initialWorkflow, versions }: WorkflowBuilderPr
       label: `${newNodeType} node`,
       owner: "builder",
       timeoutMs: 1_000,
-      retryLimit: 1
+      retryLimit: 1,
+      ...(newNodeType === "tool_call"
+        ? {
+            toolPermissionScope: ["search"],
+            toolCallPolicy: {
+              timeoutMs: 1_000,
+              retryLimit: 1,
+              maxCalls: 3
+            }
+          }
+        : {})
     };
 
     syncNodes([...workflow.nodes, createdNode]);
@@ -283,6 +293,79 @@ export function WorkflowBuilder({ initialWorkflow, versions }: WorkflowBuilderPr
                   />
                 </label>
               </div>
+              {node.type === "tool_call" ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 8 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>Tool Scope (comma-separated)</span>
+                    <input
+                      value={(node.toolPermissionScope ?? []).join(",")}
+                      onChange={(event) =>
+                        updateNodeField(index, {
+                          toolPermissionScope: event.target.value
+                            .split(",")
+                            .map((value) => value.trim())
+                            .filter((value) => value.length > 0)
+                        })
+                      }
+                      style={{ padding: 6 }}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>Tool Timeout (ms)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={node.toolCallPolicy?.timeoutMs ?? 1_000}
+                      onChange={(event) =>
+                        updateNodeField(index, {
+                          toolCallPolicy: {
+                            timeoutMs: Number(event.target.value) || 1_000,
+                            retryLimit: node.toolCallPolicy?.retryLimit ?? 1,
+                            maxCalls: node.toolCallPolicy?.maxCalls ?? 3
+                          }
+                        })
+                      }
+                      style={{ padding: 6 }}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>Tool Retry</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={node.toolCallPolicy?.retryLimit ?? 1}
+                      onChange={(event) =>
+                        updateNodeField(index, {
+                          toolCallPolicy: {
+                            timeoutMs: node.toolCallPolicy?.timeoutMs ?? 1_000,
+                            retryLimit: Number(event.target.value) || 0,
+                            maxCalls: node.toolCallPolicy?.maxCalls ?? 3
+                          }
+                        })
+                      }
+                      style={{ padding: 6 }}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>Max Tool Calls</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={node.toolCallPolicy?.maxCalls ?? 3}
+                      onChange={(event) =>
+                        updateNodeField(index, {
+                          toolCallPolicy: {
+                            timeoutMs: node.toolCallPolicy?.timeoutMs ?? 1_000,
+                            retryLimit: node.toolCallPolicy?.retryLimit ?? 1,
+                            maxCalls: Number(event.target.value) || 1
+                          }
+                        })
+                      }
+                      style={{ padding: 6 }}
+                    />
+                  </label>
+                </div>
+              ) : null}
               <button type="button" onClick={() => removeNode(node.id)} style={{ marginTop: 8, padding: "6px 10px" }}>
                 Remove Node
               </button>

@@ -4,6 +4,7 @@ export type {
   PromptPatch,
   RemediationRecommendation,
   WorkflowNodeType,
+  ToolCallPolicy,
   WorkflowNode,
   WorkflowDefinition,
   LintReport,

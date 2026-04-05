@@ -13,6 +13,24 @@ import { withRetry } from "./retry.js";
 
 const STAGES: RunStage[] = ["plan", "execute", "verify"];
 
+function toolPolicySnapshot(workflow: WorkflowDefinition): Array<{
+  nodeId: string;
+  scope: string[];
+  timeoutMs: number | null;
+  retryLimit: number | null;
+  maxCalls: number | null;
+}> {
+  return workflow.nodes
+    .filter((node) => node.type === "tool_call")
+    .map((node) => ({
+      nodeId: node.id,
+      scope: node.toolPermissionScope ?? [],
+      timeoutMs: node.toolCallPolicy?.timeoutMs ?? null,
+      retryLimit: node.toolCallPolicy?.retryLimit ?? null,
+      maxCalls: node.toolCallPolicy?.maxCalls ?? null
+    }));
+}
+
 function uniquePreserveOrder(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -214,6 +232,11 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
             severity: finding.severity
           }
         });
+      }
+
+      const toolPolicies = toolPolicySnapshot(workflow);
+      if (toolPolicies.length > 0) {
+        await dependencies.persistence.storeArtifact(runId, "tool-execution-policy", JSON.stringify(toolPolicies));
       }
 
       if (lintReport.blocked) {

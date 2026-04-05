@@ -22,12 +22,14 @@
     "HAR001",
     "HAR002",
     "HAR003",
-    "HAR004"
+    "HAR004",
+    "HAR005"
   ],
   "requiredDecisionRecords": [
     "docs/architecture/decision-records/0001-harness-first-runtime.md",
     "docs/architecture/decision-records/0002-api-tenancy-boundaries.md",
-    "docs/architecture/decision-records/0003-workflow-version-lifecycle.md"
+    "docs/architecture/decision-records/0003-workflow-version-lifecycle.md",
+    "docs/architecture/decision-records/0004-tool-call-budget-policy.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,

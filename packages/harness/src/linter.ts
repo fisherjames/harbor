@@ -73,6 +73,13 @@ function recommendationForRule(ruleId: string): Pick<RemediationRecommendation, 
     };
   }
 
+  if (ruleId === "HAR005") {
+    return {
+      suggestion: "Promote per-tool timeout/retry/max-call budget templates for tool nodes.",
+      templateTarget: "tooling"
+    };
+  }
+
   if (ruleId === "HAR003") {
     return {
       suggestion: "Promote default timeout/retry budget template for every workflow node.",
