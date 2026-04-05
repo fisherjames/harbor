@@ -22,6 +22,7 @@
 4. Validate docs/vision contracts before milestone changes:
 - `pnpm vision:check`
 - `pnpm docs:check`
+- `pnpm legibility:check`
 
 ## Harness + Docs Cadence
 
@@ -30,6 +31,7 @@
 - Keep linter remediation language aligned with the runtime `Harness Resolution Steps` section.
 - Keep runtime guarantees documented: worktree-bound execution, per-run ephemeral observability, and run idempotency key behavior.
 - Keep promotion guarantees documented: deploy/publish must report eval gate and GitHub promotion check outcomes.
+- Keep repository legibility guarantees documented: docs index, workspace READMEs, and naming conventions must pass `pnpm legibility:check`.
 
 ## Milestone Verification
 
@@ -37,12 +39,14 @@
 2. Update `DOCS_CADENCE_METADATA` in this document to match phase statuses and harness rules.
 3. Ensure completed/in-progress phases set `docsVerified: true`.
 4. Run `pnpm check` and confirm both vision and docs drift gates pass.
-5. Add milestone evidence paths before marking phase complete.
+5. Confirm the agent legibility gate passes (`pnpm legibility:check`).
+6. Add milestone evidence paths before marking phase complete.
 
 ## Phase Evidence Map
 
 - `phase-1` (MVP Core): runtime, run dashboard, persistence foundations.
 - `phase-2` (MVP Complete): visual builder, version lifecycle, runtime safety policies.
+- `phase-2` (MVP Complete): visual builder, version lifecycle, runtime safety policies, and agent legibility drift gates.
 - `phase-3` (Polished Production): idempotency hardening, replay tooling, operational dashboards.
 - `phase-4` (Enterprise Foundation): SAML/SCIM, immutable audit exports, policy governance.
 - `phase-5` (Full Enterprise Product): self-host packaging, HA topology, contract-grade SLO reporting.

@@ -29,6 +29,11 @@ function hasDependency(packageJsonPath, dependencyName) {
   return Boolean(dependencies[dependencyName]);
 }
 
+function hasScript(packageJsonPath, scriptName) {
+  const pkg = readJson(packageJsonPath);
+  return Boolean(pkg.scripts?.[scriptName]);
+}
+
 const failures = [];
 const warnings = [];
 
@@ -192,6 +197,51 @@ if (!agentsContract.includes("Use only repository-local rules and skills")) {
   fail("Project-scope drift: AGENTS.md no longer enforces repo-local rules/skills");
 } else {
   pass("AGENTS.md enforces repo-local rules/skills");
+}
+
+if (visionContract.requiredPolicies?.agentLegibilityGate) {
+  if (!fileExists("scripts/agent-legibility-check.mjs")) {
+    fail("Legibility drift: scripts/agent-legibility-check.mjs is missing");
+  } else {
+    pass("Legibility drift check script exists");
+  }
+
+  if (!hasScript("package.json", "legibility:check")) {
+    fail("Legibility drift: package.json missing legibility:check script");
+  } else {
+    pass("Root package exposes legibility:check script");
+  }
+
+  const rootPkg = readJson("package.json");
+  const rootCheck = String(rootPkg.scripts?.check ?? "");
+  if (!rootCheck.includes("pnpm legibility:check")) {
+    fail("Legibility drift: root check script does not include pnpm legibility:check");
+  } else {
+    pass("Root check script includes legibility gate");
+  }
+
+  if (!fileExists("docs/README.md")) {
+    fail("Legibility drift: docs/README.md is missing");
+  } else {
+    const docsIndex = readText("docs/README.md");
+    if (!docsIndex.includes("# Harbor Docs Index")) {
+      fail("Legibility drift: docs/README.md missing docs index heading");
+    } else {
+      pass("Docs index heading present");
+    }
+  }
+
+  if (!agentsContract.includes("docs/README.md")) {
+    fail("Legibility drift: AGENTS.md missing docs index pointer");
+  } else {
+    pass("AGENTS.md includes docs index pointer");
+  }
+
+  if (!/legibility/.test(normalizedVisionDoc)) {
+    fail("Vision drift: repository legibility policy missing from vision.md");
+  } else {
+    pass("Vision includes repository legibility policy");
+  }
 }
 
 if (visionContract.requiredPolicies?.worktreeBoundRuns) {

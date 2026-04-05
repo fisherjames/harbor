@@ -18,7 +18,8 @@
     "memoryPosture": "managed_memu_first",
     "vcsIntegration": "github_only_mvp",
     "runIsolation": "worktree_bound_per_run",
-    "runObservability": "ephemeral_per_run"
+    "runObservability": "ephemeral_per_run",
+    "repoLegibility": "contracted_agent_legibility_gate"
   },
   "requiredHarnessRules": [
     "HAR001",
@@ -33,7 +34,8 @@
     "docs/architecture/decision-records/0003-workflow-version-lifecycle.md",
     "docs/architecture/decision-records/0004-tool-call-budget-policy.md",
     "docs/architecture/decision-records/0005-run-worktree-isolation.md",
-    "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md"
+    "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
+    "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,
@@ -43,6 +45,7 @@
     "runCanBuildWholeStack": true,
     "ephemeralObservabilityPerRun": true,
     "evalGateOnDeploy": true,
-    "githubPromotionChecks": true
+    "githubPromotionChecks": true,
+    "agentLegibilityGate": true
   }
 }

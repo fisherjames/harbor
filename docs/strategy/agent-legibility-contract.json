@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "requiredEntrypoints": [
+    "AGENTS.md",
+    "README.md",
+    "docs/README.md",
+    "docs/architecture/ARCHITECTURE.md",
+    "docs/getting-started.md",
+    "docs/exec-plans/index.md",
+    "docs/exec-plans/tech-debt-tracker.md"
+  ],
+  "requiredDirectories": [
+    "docs/exec-plans/active",
+    "docs/exec-plans/completed"
+  ],
+  "agents": {
+    "maxLines": 160,
+    "requiredPointers": [
+      "docs/README.md",
+      "docs/strategy/vision.md",
+      "docs/architecture/ARCHITECTURE.md",
+      "docs/getting-started.md"
+    ]
+  },
+  "docsIndex": {
+    "requiredHeadings": [
+      "# Harbor Docs Index",
+      "## Start Here",
+      "## Strategy",
+      "## Architecture",
+      "## Execution Plans",
+      "## Naming Conventions"
+    ]
+  },
+  "workspaceReadmes": {
+    "required": [
+      "apps/web/README.md",
+      "apps/worker/README.md",
+      "packages/api/README.md",
+      "packages/database/README.md",
+      "packages/engine/README.md",
+      "packages/harness/README.md",
+      "packages/memu/README.md",
+      "packages/observability/README.md"
+    ],
+    "requiredSections": [
+      "## Purpose",
+      "## Entrypoints"
+    ]
+  },
+  "naming": {
+    "docsAllowedUppercase": [
+      "README.md",
+      "ARCHITECTURE.md"
+    ]
+  }
+}

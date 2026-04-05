@@ -12,6 +12,7 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Preserve context and reduce token waste with memU-backed retrieval/writeback.
 - Support multi-tenant operation with strict tenancy boundaries and auditability.
 - Provide per-run ephemeral observability so traces/log pipelines are isolated and disposable by run.
+- Keep the repository legible to coding agents with indexed docs, stable naming, and machine-checked structure.
 
 ## Locked Decisions
 - Durable runtime: Inngest first.
@@ -24,6 +25,7 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Linter policy: block on critical, inject remediation steps for non-critical findings.
 - Run isolation policy: every run is worktree-bound and can boot the whole stack in isolation.
 - Observability policy: each run owns an ephemeral observability envelope with explicit retention.
+- Legibility policy: repository structure and naming conventions are enforced by an automated drift gate.
 - Enterprise baseline: SOC2 readiness, SAML, SCIM, immutable audit trail.
 
 ## Phase Targets
@@ -43,4 +45,5 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - memU writes include category/path and retention-aware metadata.
 - Every run binds to a dedicated worktree and can build/run the full stack without sharing mutable runtime state.
 - Every run emits to a run-scoped ephemeral observability channel with deterministic cleanup.
+- Repository entry docs and workspace README maps must stay synchronized and pass legibility drift checks.
 - New behavior includes success-path and failure-path tests.

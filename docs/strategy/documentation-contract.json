@@ -1,7 +1,10 @@
 {
   "version": 1,
   "requiredDocuments": [
-    "docs/getting-started.md"
+    "docs/getting-started.md",
+    "docs/README.md",
+    "docs/architecture/ARCHITECTURE.md",
+    "docs/strategy/agent-legibility-contract.json"
   ],
   "gettingStarted": {
     "metadataStart": "<!-- DOCS_CADENCE_METADATA_BEGIN -->",
@@ -16,7 +19,8 @@
     "requiredCommands": [
       "pnpm check",
       "pnpm vision:check",
-      "pnpm docs:check"
+      "pnpm docs:check",
+      "pnpm legibility:check"
     ],
     "requiredPhrases": [
       "worktree-bound",

@@ -26,6 +26,13 @@ This repository currently contains a working Phase 1 foundation:
 - `packages/memu`
 - `packages/observability`
 
+## Repository Knowledge Map
+
+- [`/Users/james/Documents/GitHub/harbor/AGENTS.md`](/Users/james/Documents/GitHub/harbor/AGENTS.md): agent operating contract and invariants.
+- [`/Users/james/Documents/GitHub/harbor/docs/README.md`](/Users/james/Documents/GitHub/harbor/docs/README.md): canonical documentation index.
+- [`/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md`](/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md): architecture boundaries and dependency flow.
+- [`/Users/james/Documents/GitHub/harbor/docs/strategy/vision.md`](/Users/james/Documents/GitHub/harbor/docs/strategy/vision.md): locked decisions and phase direction.
+
 ## Local Development
 
 1. Install dependencies:
@@ -38,6 +45,7 @@ pnpm install
 
 ```bash
 pnpm check
+pnpm legibility:check
 ```
 
 3. Start local infra:
