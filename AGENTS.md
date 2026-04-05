@@ -11,6 +11,7 @@ Harbor is a standalone TypeScript agent orchestration platform with harness-firs
 - [`docs/strategy/vision.md`](docs/strategy/vision.md): locked decisions and non-negotiable invariants.
 - [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md): package boundaries and dependency flow.
 - [`docs/getting-started.md`](docs/getting-started.md): milestone cadence and validation checklist.
+- [`docs/team-standards/README.md`](docs/team-standards/README.md): encoded team standards and calibration loop.
 
 ## Project-Scoped Only
 - Use only repository-local rules and skills.
@@ -31,4 +32,5 @@ Harbor is a standalone TypeScript agent orchestration platform with harness-firs
 - Architectural decisions that change contracts must add/update an ADR in `docs/architecture/decision-records`.
 - Milestone/phase changes must update `docs/getting-started.md` cadence metadata and pass `pnpm docs:check`.
 - Agent legibility drift must pass `pnpm legibility:check` before merge.
+- Team standards drift must pass `pnpm standards:check` before merge.
 - When proposing run-runtime architecture, always include worktree isolation and ephemeral observability recommendations.

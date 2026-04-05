@@ -35,7 +35,8 @@
     "docs/architecture/decision-records/0004-tool-call-budget-policy.md",
     "docs/architecture/decision-records/0005-run-worktree-isolation.md",
     "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
-    "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md"
+    "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
+    "docs/architecture/decision-records/0008-team-standards-encoding-gate.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,
@@ -46,6 +47,7 @@
     "ephemeralObservabilityPerRun": true,
     "evalGateOnDeploy": true,
     "githubPromotionChecks": true,
-    "agentLegibilityGate": true
+    "agentLegibilityGate": true,
+    "teamStandardsEncodingGate": true
   }
 }

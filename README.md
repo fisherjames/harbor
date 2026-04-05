@@ -46,6 +46,7 @@ pnpm install
 ```bash
 pnpm check
 pnpm legibility:check
+pnpm standards:check
 ```
 
 3. Start local infra:
@@ -67,5 +68,6 @@ Critical findings block runs/deploys. Warning/info findings are injected into pr
 
 - Phase 1: done as foundational runtime and contracts in this repo.
 - Phase 2: visual workflow builder and GitHub-backed promotion flow are implemented.
-- Phase 2.5: harness + legibility hardening is in progress.
+- Phase 2.5: harness + legibility hardening is complete.
+- Phase 2.6: team standards encoding and standards drift gates are in progress.
 - Phase 3+: MCP registry expansion, deeper eval harnesses, and production/enterprise controls.

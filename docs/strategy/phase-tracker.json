@@ -1,5 +1,5 @@
 {
-  "currentPhase": "phase-2.5",
+  "currentPhase": "phase-2.6",
   "phases": [
     {
       "id": "phase-1",
@@ -30,7 +30,7 @@
     {
       "id": "phase-2.5",
       "name": "Harness + Legibility Hardening",
-      "status": "in_progress",
+      "status": "complete",
       "evidence": [
         "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
         "docs/README.md",
@@ -39,6 +39,22 @@
         "scripts/agent-legibility-check.mjs",
         "scripts/vision-drift-check.mjs",
         "AGENTS.md"
+      ]
+    },
+    {
+      "id": "phase-2.6",
+      "name": "Team Standards Encoding",
+      "status": "in_progress",
+      "evidence": [
+        "docs/team-standards/README.md",
+        "docs/team-standards/generation.md",
+        "docs/team-standards/refactoring.md",
+        "docs/team-standards/security.md",
+        "docs/team-standards/review.md",
+        "docs/team-standards/calibration.md",
+        "docs/strategy/team-standards-contract.json",
+        "scripts/standards-encoding-check.mjs",
+        "docs/architecture/decision-records/0008-team-standards-encoding-gate.md"
       ]
     },
     {

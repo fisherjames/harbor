@@ -18,6 +18,10 @@ This index is the canonical entrypoint for both humans and coding agents.
 - [`/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md`](/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md)
 - [`/Users/james/Documents/GitHub/harbor/docs/architecture/decision-records`](/Users/james/Documents/GitHub/harbor/docs/architecture/decision-records)
 
+## Team Standards
+- [`/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md`](/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md)
+- [`/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json)
+
 ## Execution Plans
 - [`/Users/james/Documents/GitHub/harbor/docs/exec-plans/index.md`](/Users/james/Documents/GitHub/harbor/docs/exec-plans/index.md)
 - [`/Users/james/Documents/GitHub/harbor/docs/exec-plans/active/README.md`](/Users/james/Documents/GitHub/harbor/docs/exec-plans/active/README.md)

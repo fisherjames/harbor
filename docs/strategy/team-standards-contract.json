@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "requiredFiles": [
+    "docs/team-standards/README.md",
+    "docs/team-standards/generation.md",
+    "docs/team-standards/refactoring.md",
+    "docs/team-standards/security.md",
+    "docs/team-standards/review.md",
+    "docs/team-standards/calibration.md"
+  ],
+  "forbiddenPatterns": [
+    "~/.cursor",
+    "~/.codex"
+  ],
+  "instructionTemplate": {
+    "files": [
+      "docs/team-standards/generation.md",
+      "docs/team-standards/refactoring.md",
+      "docs/team-standards/security.md",
+      "docs/team-standards/review.md"
+    ],
+    "maxLines": 180,
+    "requiredHeadings": [
+      "## Role Definition",
+      "## Context Requirements",
+      "## Categorized Standards",
+      "## Output Format",
+      "## Scope Boundary"
+    ],
+    "requiredSubheadings": [
+      "### Critical",
+      "### Important",
+      "### Advisory"
+    ],
+    "requiredPhrases": [
+      "Single purpose"
+    ]
+  },
+  "readme": {
+    "requiredHeadings": [
+      "# Team Standards Instructions",
+      "## Purpose",
+      "## Instruction Set",
+      "## Calibration",
+      "## Validation"
+    ],
+    "requiredMentions": [
+      "`generation.md`",
+      "`refactoring.md`",
+      "`security.md`",
+      "`review.md`",
+      "`calibration.md`",
+      "pnpm standards:check"
+    ]
+  },
+  "calibration": {
+    "file": "docs/team-standards/calibration.md",
+    "requiredHeadings": [
+      "# Team Standards Calibration",
+      "## Cadence",
+      "## Trigger Signals",
+      "## Calibration Steps",
+      "## History"
+    ],
+    "historyEntryPattern": "\\d{4}-\\d{2}-\\d{2}:",
+    "historyMinimumEntries": 1
+  }
+}

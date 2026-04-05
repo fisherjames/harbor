@@ -4,7 +4,9 @@
     "docs/getting-started.md",
     "docs/README.md",
     "docs/architecture/ARCHITECTURE.md",
-    "docs/strategy/agent-legibility-contract.json"
+    "docs/strategy/agent-legibility-contract.json",
+    "docs/team-standards/README.md",
+    "docs/strategy/team-standards-contract.json"
   ],
   "gettingStarted": {
     "metadataStart": "<!-- DOCS_CADENCE_METADATA_BEGIN -->",
@@ -20,7 +22,8 @@
       "pnpm check",
       "pnpm vision:check",
       "pnpm docs:check",
-      "pnpm legibility:check"
+      "pnpm legibility:check",
+      "pnpm standards:check"
     ],
     "requiredPhrases": [
       "worktree-bound",

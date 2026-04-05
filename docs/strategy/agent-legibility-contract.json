@@ -6,6 +6,8 @@
     "docs/README.md",
     "docs/architecture/ARCHITECTURE.md",
     "docs/getting-started.md",
+    "docs/team-standards/README.md",
+    "docs/strategy/team-standards-contract.json",
     "docs/exec-plans/index.md",
     "docs/exec-plans/tech-debt-tracker.md"
   ],
@@ -28,6 +30,7 @@
       "## Start Here",
       "## Strategy",
       "## Architecture",
+      "## Team Standards",
       "## Execution Plans",
       "## Naming Conventions"
     ]

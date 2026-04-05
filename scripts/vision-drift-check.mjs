@@ -244,6 +244,46 @@ if (visionContract.requiredPolicies?.agentLegibilityGate) {
   }
 }
 
+if (visionContract.requiredPolicies?.teamStandardsEncodingGate) {
+  if (!fileExists("scripts/standards-encoding-check.mjs")) {
+    fail("Standards drift: scripts/standards-encoding-check.mjs is missing");
+  } else {
+    pass("Standards drift check script exists");
+  }
+
+  if (!hasScript("package.json", "standards:check")) {
+    fail("Standards drift: package.json missing standards:check script");
+  } else {
+    pass("Root package exposes standards:check script");
+  }
+
+  const rootPkg = readJson("package.json");
+  const rootCheck = String(rootPkg.scripts?.check ?? "");
+  if (!rootCheck.includes("pnpm standards:check")) {
+    fail("Standards drift: root check script does not include pnpm standards:check");
+  } else {
+    pass("Root check script includes standards gate");
+  }
+
+  if (!fileExists("docs/strategy/team-standards-contract.json")) {
+    fail("Standards drift: docs/strategy/team-standards-contract.json is missing");
+  } else {
+    pass("Team standards contract exists");
+  }
+
+  if (!fileExists("docs/team-standards/README.md")) {
+    fail("Standards drift: docs/team-standards/README.md is missing");
+  } else {
+    pass("Team standards README exists");
+  }
+
+  if (!/team\s+standards/.test(normalizedVisionDoc)) {
+    fail("Vision drift: team standards encoding policy missing from vision.md");
+  } else {
+    pass("Vision includes team standards encoding policy");
+  }
+}
+
 if (visionContract.requiredPolicies?.worktreeBoundRuns) {
   if (!/worktree\s+bound/.test(normalizedVisionDoc)) {
     fail("Vision drift: worktree-bound run policy missing from vision.md");

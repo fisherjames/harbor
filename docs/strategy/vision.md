@@ -26,15 +26,17 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Run isolation policy: every run is worktree-bound and can boot the whole stack in isolation.
 - Observability policy: each run owns an ephemeral observability envelope with explicit retention.
 - Legibility policy: repository structure and naming conventions are enforced by an automated drift gate.
+- Team standards policy: engineering standards are encoded as project-scoped instruction files with an automated drift gate.
 - Enterprise baseline: SOC2 readiness, SAML, SCIM, immutable audit trail.
 
 ## Phase Targets
 1. Phase 1 (MVP Core): reliable end-to-end execution path with observability and memU context.
 2. Phase 2 (MVP Complete): visual builder, typed node graph lifecycle, tool orchestration, and promotion workflows.
 3. Phase 2.5 (Harness + Legibility Hardening): convert proven improvements into enforceable contracts and drift gates.
-4. Phase 3 (Polished Production): reliability hardening, stronger product UX, and security baseline.
-5. Phase 4 (Enterprise Foundation): identity, compliance controls, and policy governance.
-6. Phase 5 (Full Enterprise Product): deployment modes, HA operations, and enterprise governance features.
+4. Phase 2.6 (Team Standards Encoding): encode generation/refactor/security/review standards with calibration and CI enforcement.
+5. Phase 3 (Polished Production): reliability hardening, stronger product UX, and security baseline.
+6. Phase 4 (Enterprise Foundation): identity, compliance controls, and policy governance.
+7. Phase 5 (Full Enterprise Product): deployment modes, HA operations, and enterprise governance features.
 
 ## Non-Negotiable Invariants
 - API procedures must enforce `tenantId`, `workspaceId`, and `actorId` scoping.
@@ -47,4 +49,5 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Every run binds to a dedicated worktree and can build/run the full stack without sharing mutable runtime state.
 - Every run emits to a run-scoped ephemeral observability channel with deterministic cleanup.
 - Repository entry docs and workspace README maps must stay synchronized and pass legibility drift checks.
+- Team standards instruction files and calibration history must stay synchronized and pass standards drift checks.
 - New behavior includes success-path and failure-path tests.
