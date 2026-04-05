@@ -98,5 +98,19 @@
       "doc",
       "code"
     ]
+  },
+  "report": {
+    "path": "docs/team-standards/reports/latest.json",
+    "version": 1,
+    "requiredTopLevelKeys": [
+      "version",
+      "generatedBy",
+      "currentPhase",
+      "status",
+      "counts",
+      "failures",
+      "warnings",
+      "passes"
+    ]
   }
 }

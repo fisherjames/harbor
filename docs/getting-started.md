@@ -36,6 +36,7 @@
 - Keep promotion guarantees documented: deploy/publish must report eval gate and GitHub promotion check outcomes.
 - Keep repository legibility guarantees documented: docs index, workspace READMEs, and naming conventions must pass `pnpm legibility:check`.
 - Keep team standards encoding guarantees documented: instruction anatomy and calibration history must pass `pnpm standards:check`.
+- Keep team standards drift report current at `docs/team-standards/reports/latest.json`.
 
 ## Milestone Verification
 

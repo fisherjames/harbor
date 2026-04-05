@@ -21,3 +21,4 @@ These files encode Harbor's tacit team standards into executable, versioned arti
 
 ## Validation
 - `pnpm standards:check` validates instruction anatomy and scope limits.
+- `pnpm standards:check` updates `docs/team-standards/reports/latest.json` with the latest drift report.

@@ -36,6 +36,7 @@ function parseIsoDate(input) {
 
 const failures = [];
 const warnings = [];
+const passes = [];
 
 function fail(message) {
   failures.push(message);
@@ -46,6 +47,7 @@ function warn(message) {
 }
 
 function pass(message) {
+  passes.push(message);
   console.log(`PASS ${message}`);
 }
 
@@ -56,6 +58,67 @@ if (!fileExists(contractPath)) {
 }
 
 const contract = readJson(contractPath);
+
+function readCurrentPhase() {
+  const phaseTrackerPath = "docs/strategy/phase-tracker.json";
+  if (!fileExists(phaseTrackerPath)) {
+    return "unknown";
+  }
+
+  try {
+    const phaseTracker = readJson(phaseTrackerPath);
+    return typeof phaseTracker.currentPhase === "string" ? phaseTracker.currentPhase : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function computeStatus() {
+  if (failures.length > 0) {
+    return "fail";
+  }
+
+  if (warnings.length > 0) {
+    return "warn";
+  }
+
+  return "pass";
+}
+
+function writeReport() {
+  const reportConfig = contract.report ?? {};
+  const reportPath = reportConfig.path;
+
+  if (typeof reportPath !== "string" || reportPath.length === 0) {
+    return;
+  }
+
+  const report = {
+    version: Number(reportConfig.version ?? 1),
+    generatedBy: "scripts/standards-encoding-check.mjs",
+    currentPhase: readCurrentPhase(),
+    status: computeStatus(),
+    counts: {
+      passes: passes.length,
+      warnings: warnings.length,
+      failures: failures.length
+    },
+    failures: [...failures],
+    warnings: [...warnings],
+    passes: [...passes]
+  };
+
+  for (const key of reportConfig.requiredTopLevelKeys ?? []) {
+    if (!(key in report)) {
+      fail(`Standards drift: report is missing top-level key '${key}'`);
+    }
+  }
+
+  const absoluteReportPath = resolve(reportPath);
+  const serialized = `${JSON.stringify(report, null, 2)}\n`;
+  fs.mkdirSync(path.dirname(absoluteReportPath), { recursive: true });
+  fs.writeFileSync(absoluteReportPath, serialized, "utf8");
+}
 
 for (const requiredPath of contract.requiredFiles ?? []) {
   if (!fileExists(requiredPath)) {
@@ -442,6 +505,8 @@ if (fileExists(agentsPath)) {
     pass("AGENTS.md points to team standards index");
   }
 }
+
+writeReport();
 
 console.log("");
 console.log("Standards Encoding Check Summary");
