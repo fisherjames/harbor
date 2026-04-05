@@ -139,6 +139,18 @@ function createRouter(overrides?: Partial<HarborApiDependencies>) {
         savedBy: "user_1"
       };
     },
+    async createPromotionPullRequest(_context, input) {
+      return {
+        repository: "owner/repo",
+        baseBranch: input.baseBranch ?? "main",
+        headBranch: input.headBranch ?? `harbor/promotion/${input.workflowId}-v${input.version}`,
+        artifactPath: `harbor/workflows/${input.workflowId}/v${input.version}.json`,
+        status: "created",
+        summary: "Promotion pull request created.",
+        pullRequestNumber: 11,
+        pullRequestUrl: "https://github.com/owner/repo/pull/11"
+      };
+    },
     ...overrides
   };
 
@@ -605,6 +617,164 @@ describe("createHarborRouter", () => {
     expect(published.evalGate.status).toBe("passed");
     expect(published.promotionGate.status).toBe("passed");
     expect(published.blockedReasons).toEqual([]);
+  });
+
+  it("returns not found when opening promotion pull request for unknown version", async () => {
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.openPromotionPullRequest({
+        workflowId: workflow.id,
+        version: workflow.version
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
+  it("skips opening promotion pull request when lint is critical", async () => {
+    const promotionCalls: Array<{ workflowId: string; version: number }> = [];
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+          }
+        };
+      },
+      async createPromotionPullRequest(_context, input) {
+        promotionCalls.push({
+          workflowId: input.workflowId,
+          version: input.version
+        });
+        return {
+          repository: "owner/repo",
+          baseBranch: "main",
+          headBranch: "harbor/promotion/blocked",
+          artifactPath: "harbor/workflows/wf_1/v1.json",
+          status: "created",
+          summary: "should not run"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toEqual(["lint"]);
+    expect(result.evalGate.status).toBe("skipped");
+    expect(result.promotionGate.status).toBe("skipped");
+    expect(result.promotion.status).toBe("skipped");
+    expect(result.promotion.baseBranch).toBe("main");
+    expect(result.promotion.headBranch).toContain("harbor/promotion/");
+    expect(promotionCalls).toHaveLength(0);
+  });
+
+  it("skips opening promotion pull request when eval gate fails and preserves branch overrides", async () => {
+    const promotionCalls: string[] = [];
+    const router = createRouter({
+      async runEvalGate() {
+        return {
+          suiteId: "eval-smoke",
+          status: "failed",
+          blocked: true,
+          score: 0.25,
+          summary: "Regression detected",
+          failingScenarios: ["executor_quality"]
+        };
+      },
+      async createPromotionPullRequest() {
+        promotionCalls.push("called");
+        return {
+          repository: "owner/repo",
+          baseBranch: "main",
+          headBranch: "head",
+          artifactPath: "path",
+          status: "created",
+          summary: "should not run"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version,
+      baseBranch: "release",
+      headBranch: "harbor/promotion/custom"
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("eval");
+    expect(result.promotion.status).toBe("skipped");
+    expect(result.promotion.baseBranch).toBe("release");
+    expect(result.promotion.headBranch).toBe("harbor/promotion/custom");
+    expect(promotionCalls).toHaveLength(0);
+  });
+
+  it("opens promotion pull request when gates pass", async () => {
+    const calls: Array<{
+      workflowId: string;
+      version: number;
+      baseBranch?: string | undefined;
+      headBranch?: string | undefined;
+    }> = [];
+    const router = createRouter({
+      async createPromotionPullRequest(_context, input) {
+        calls.push({
+          workflowId: input.workflowId,
+          version: input.version,
+          baseBranch: input.baseBranch,
+          headBranch: input.headBranch
+        });
+        return {
+          repository: "owner/repo",
+          baseBranch: input.baseBranch ?? "main",
+          headBranch: input.headBranch ?? "harbor/promotion/default",
+          artifactPath: `harbor/workflows/${input.workflowId}/v${input.version}.json`,
+          status: "created",
+          summary: "Promotion pull request created.",
+          pullRequestNumber: 77,
+          pullRequestUrl: "https://github.com/owner/repo/pull/77"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version,
+      baseBranch: "release",
+      headBranch: "harbor/promotion/wf_1-v1"
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      workflowId: workflow.id,
+      version: workflow.version,
+      baseBranch: "release",
+      headBranch: "harbor/promotion/wf_1-v1"
+    });
+    expect(result.blocked).toBe(false);
+    expect(result.blockedReasons).toEqual([]);
+    expect(result.promotion.status).toBe("created");
+    expect(result.promotion.pullRequestNumber).toBe(77);
+    expect(result.promotion.pullRequestUrl).toContain("/pull/77");
   });
 
   it("accepts typed tool policy fields in workflow input", async () => {

@@ -21,7 +21,10 @@ export type {
   GetWorkflowVersionInput,
   WorkflowVersionDetail,
   PublishWorkflowVersionInput,
-  PublishWorkflowVersionOutput
+  PublishWorkflowVersionOutput,
+  OpenPromotionPullRequestInput,
+  PromotionPullRequestResult,
+  OpenPromotionPullRequestOutput
 } from "./types.js";
 export { createHarborRouter, type HarborApiDependencies, type HarborRouter } from "./router.js";
 import type { HarborRouter } from "./router.js";

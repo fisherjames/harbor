@@ -66,4 +66,6 @@ Critical findings block runs/deploys. Warning/info findings are injected into pr
 ## Roadmap
 
 - Phase 1: done as foundational runtime and contracts in this repo.
-- Phase 2+: visual workflow builder, MCP registry, GitHub promotion flow, deeper eval harnesses, enterprise controls.
+- Phase 2: visual workflow builder and GitHub-backed promotion flow are implemented.
+- Phase 2.5: harness + legibility hardening is in progress.
+- Phase 3+: MCP registry expansion, deeper eval harnesses, and production/enterprise controls.

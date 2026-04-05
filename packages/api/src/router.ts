@@ -11,6 +11,8 @@ import type {
   GetWorkflowVersionInput,
   HarborApiContext,
   ListRunsInput,
+  OpenPromotionPullRequestOutput,
+  PromotionPullRequestResult,
   PublishWorkflowVersionOutput,
   RunDetail,
   RunSummary,
@@ -93,6 +95,13 @@ const publishWorkflowVersionInputSchema = z.object({
   version: z.number().int().min(1)
 });
 
+const openPromotionPullRequestInputSchema = z.object({
+  workflowId: z.string().min(1),
+  version: z.number().int().min(1),
+  baseBranch: z.string().trim().min(1).max(255).optional(),
+  headBranch: z.string().trim().min(1).max(255).optional()
+});
+
 const listRunsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
   status: z.enum(["queued", "running", "needs_human", "failed", "completed"]).optional(),
@@ -143,6 +152,16 @@ export interface HarborApiDependencies {
       version: number;
     }
   ): Promise<WorkflowVersionSummary | null>;
+  createPromotionPullRequest(
+    context: HarborApiContext,
+    input: {
+      workflow: WorkflowDefinition;
+      workflowId: string;
+      version: number;
+      baseBranch?: string | undefined;
+      headBranch?: string | undefined;
+    }
+  ): Promise<PromotionPullRequestResult>;
   runEvalGate?(context: HarborApiContext, input: EvalGateInput): Promise<EvalGateSummary>;
   runPromotionChecks?(context: HarborApiContext, input: PromotionGateInput): Promise<PromotionGateSummary>;
 }
@@ -235,6 +254,27 @@ function skippedPromotionGate(reason: string): PromotionGateSummary {
         summary: reason
       }
     ]
+  };
+}
+
+function blockedPromotionResult(input: {
+  workflowId: string;
+  version: number;
+  blockedReasons: DeployBlockReason[];
+  promotionGate: PromotionGateSummary;
+  baseBranch?: string | undefined;
+  headBranch?: string | undefined;
+}): PromotionPullRequestResult {
+  const baseBranch = input.baseBranch ?? input.promotionGate.branch;
+  const headBranch = input.headBranch ?? `harbor/promotion/${input.workflowId}-v${input.version}`;
+
+  return {
+    repository: input.promotionGate.repository,
+    baseBranch,
+    headBranch,
+    artifactPath: `harbor/workflows/${input.workflowId}/v${input.version}.json`,
+    status: "skipped",
+    summary: `Promotion pull request skipped because deploy gates are blocked: ${input.blockedReasons.join(", ")}.`
   };
 }
 
@@ -455,6 +495,67 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
           promotionGate: gates.promotionGate,
           blockedReasons: gates.blockedReasons,
           blocked: false
+        };
+      }),
+
+    openPromotionPullRequest: authzProcedure
+      .input(openPromotionPullRequestInputSchema)
+      .mutation(async ({ ctx, input }): Promise<OpenPromotionPullRequestOutput> => {
+        const version = await dependencies.getWorkflowVersion(ctx, input.workflowId, input.version);
+        if (!version) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Workflow version not found"
+          });
+        }
+
+        const lint = runLintAtExecutionPoint("deploy", version.workflow);
+        const gates = await resolveDeployGates(dependencies, ctx, {
+          workflow: version.workflow,
+          workflowId: input.workflowId,
+          version: input.version,
+          event: "publish",
+          lintFindings: lint.report.findings,
+          lintBlocked: lint.report.blocked
+        });
+
+        if (gates.blocked) {
+          return {
+            workflowId: input.workflowId,
+            version: input.version,
+            lintFindings: lint.report.findings,
+            evalGate: gates.evalGate,
+            promotionGate: gates.promotionGate,
+            blockedReasons: gates.blockedReasons,
+            blocked: true,
+            promotion: blockedPromotionResult({
+              workflowId: input.workflowId,
+              version: input.version,
+              blockedReasons: gates.blockedReasons,
+              promotionGate: gates.promotionGate,
+              baseBranch: input.baseBranch,
+              headBranch: input.headBranch
+            })
+          };
+        }
+
+        const promotion = await dependencies.createPromotionPullRequest(ctx, {
+          workflow: version.workflow,
+          workflowId: input.workflowId,
+          version: input.version,
+          baseBranch: input.baseBranch,
+          headBranch: input.headBranch
+        });
+
+        return {
+          workflowId: input.workflowId,
+          version: input.version,
+          lintFindings: lint.report.findings,
+          evalGate: gates.evalGate,
+          promotionGate: gates.promotionGate,
+          blockedReasons: gates.blockedReasons,
+          blocked: false,
+          promotion
         };
       }),
 

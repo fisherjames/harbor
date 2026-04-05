@@ -31,9 +31,10 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 ## Phase Targets
 1. Phase 1 (MVP Core): reliable end-to-end execution path with observability and memU context.
 2. Phase 2 (MVP Complete): visual builder, typed node graph lifecycle, tool orchestration, and promotion workflows.
-3. Phase 3 (Polished Production): reliability hardening, stronger product UX, and security baseline.
-4. Phase 4 (Enterprise Foundation): identity, compliance controls, and policy governance.
-5. Phase 5 (Full Enterprise Product): deployment modes, HA operations, and enterprise governance features.
+3. Phase 2.5 (Harness + Legibility Hardening): convert proven improvements into enforceable contracts and drift gates.
+4. Phase 3 (Polished Production): reliability hardening, stronger product UX, and security baseline.
+5. Phase 4 (Enterprise Foundation): identity, compliance controls, and policy governance.
+6. Phase 5 (Full Enterprise Product): deployment modes, HA operations, and enterprise governance features.
 
 ## Non-Negotiable Invariants
 - API procedures must enforce `tenantId`, `workspaceId`, and `actorId` scoping.

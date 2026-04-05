@@ -48,6 +48,14 @@ describe("web server caller", () => {
     expect(published.blocked).toBe(false);
     expect(published.state).toBe("published");
 
+    const promotion = await caller.openPromotionPullRequest({
+      workflowId: sampleWorkflow.id,
+      version: sampleWorkflow.version
+    });
+    expect(promotion.blocked).toBe(false);
+    expect(promotion.promotion.repository).toContain("/");
+    expect(["created", "skipped"]).toContain(promotion.promotion.status);
+
     const run = await caller.runWorkflow({
       workflow: sampleWorkflow,
       trigger: "manual",

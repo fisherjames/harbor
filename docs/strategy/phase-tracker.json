@@ -1,5 +1,5 @@
 {
-  "currentPhase": "phase-2",
+  "currentPhase": "phase-2.5",
   "phases": [
     {
       "id": "phase-1",
@@ -15,17 +15,30 @@
     {
       "id": "phase-2",
       "name": "MVP Complete",
-      "status": "in_progress",
+      "status": "complete",
       "evidence": [
         "apps/web/app/workflows/[workflowId]/builder/page.tsx",
         "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
         "packages/api/src/router.ts",
         "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
-        "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
-        "docs/README.md",
-        "scripts/agent-legibility-check.mjs",
+        "apps/web/src/server/github-promotion.ts",
+        "apps/web/test/github-promotion.test.ts",
         "packages/database/src/repositories/workflow-registry.ts",
         "docs/getting-started.md"
+      ]
+    },
+    {
+      "id": "phase-2.5",
+      "name": "Harness + Legibility Hardening",
+      "status": "in_progress",
+      "evidence": [
+        "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
+        "docs/README.md",
+        "docs/architecture/ARCHITECTURE.md",
+        "docs/strategy/agent-legibility-contract.json",
+        "scripts/agent-legibility-check.mjs",
+        "scripts/vision-drift-check.mjs",
+        "AGENTS.md"
       ]
     },
     {

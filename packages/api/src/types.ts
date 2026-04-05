@@ -143,3 +143,32 @@ export interface PublishWorkflowVersionOutput {
   blockedReasons: DeployBlockReason[];
   blocked: boolean;
 }
+
+export interface OpenPromotionPullRequestInput {
+  workflowId: string;
+  version: number;
+  baseBranch?: string | undefined;
+  headBranch?: string | undefined;
+}
+
+export interface PromotionPullRequestResult {
+  repository: string;
+  baseBranch: string;
+  headBranch: string;
+  artifactPath: string;
+  status: "created" | "skipped";
+  summary: string;
+  pullRequestNumber?: number | undefined;
+  pullRequestUrl?: string | undefined;
+}
+
+export interface OpenPromotionPullRequestOutput {
+  workflowId: string;
+  version: number;
+  lintFindings: LintFinding[];
+  evalGate: EvalGateSummary;
+  promotionGate: PromotionGateSummary;
+  blockedReasons: DeployBlockReason[];
+  blocked: boolean;
+  promotion: PromotionPullRequestResult;
+}
