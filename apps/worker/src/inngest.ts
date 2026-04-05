@@ -2,7 +2,11 @@ import { Inngest } from "inngest";
 import { createWorkflowRunner, EchoModelProvider, type WorkflowRunRequest } from "@harbor/engine";
 import { createInMemoryMemuClient, createMemuClient, type MemuClient } from "@harbor/memu";
 import { createRunTracer } from "@harbor/observability";
-import { InMemoryRunPersistence } from "@harbor/database";
+import {
+  InMemoryRunPersistence,
+  createPostgresRunPersistence,
+  type RunStore
+} from "@harbor/database";
 import type { WorkflowDefinition } from "@harbor/harness";
 
 export interface WorkflowRunRequestedEvent {
@@ -21,7 +25,9 @@ const memuClient: MemuClient = process.env.MEMU_ENDPOINT
     })
   : createInMemoryMemuClient();
 
-const persistence = new InMemoryRunPersistence();
+const persistence: RunStore = process.env.DATABASE_URL
+  ? createPostgresRunPersistence(process.env.DATABASE_URL)
+  : new InMemoryRunPersistence();
 const tracer = createRunTracer("harbor-worker");
 
 const runner = createWorkflowRunner({

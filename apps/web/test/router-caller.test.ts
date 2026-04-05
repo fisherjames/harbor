@@ -33,6 +33,27 @@ describe("web server caller", () => {
     });
 
     expect(run.status).toBe("completed");
+
+    const runs = await caller.listRuns({
+      limit: 10
+    });
+    expect(runs.length).toBeGreaterThan(0);
+
+    const runDetail = await caller.getRun({
+      runId: run.runId
+    });
+    expect(runDetail.runId).toBe(run.runId);
+
+    const escalated = await caller.escalateRun({
+      runId: run.runId,
+      reason: "Operator requested review"
+    });
+    expect(escalated.status).toBe("needs_human");
+
+    const escalatedDefaultReason = await caller.escalateRun({
+      runId: run.runId
+    });
+    expect(escalatedDefaultReason.status).toBe("needs_human");
   });
 
   it("creates caller from headers", async () => {

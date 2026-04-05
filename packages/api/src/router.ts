@@ -2,8 +2,14 @@ import { randomUUID } from "node:crypto";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { runLintAtExecutionPoint, type WorkflowDefinition } from "@harbor/harness";
-import type { WorkflowRunRequest, WorkflowRunResult } from "@harbor/engine";
-import type { DeployWorkflowOutput, HarborApiContext } from "./types.js";
+import type { RunStatus, WorkflowRunRequest, WorkflowRunResult } from "@harbor/engine";
+import type {
+  DeployWorkflowOutput,
+  HarborApiContext,
+  ListRunsInput,
+  RunDetail,
+  RunSummary
+} from "./types.js";
 
 const memoryPolicySchema = z.object({
   retrievalMode: z.enum(["monitor", "reason"]),
@@ -51,8 +57,36 @@ const runInputSchema = z.object({
   input: z.record(z.unknown())
 });
 
+const listRunsInputSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+  status: z.enum(["queued", "running", "needs_human", "failed", "completed"]).optional(),
+  workflowId: z.string().min(1).optional()
+});
+
+const getRunInputSchema = z.object({
+  runId: z.string().min(1)
+});
+
+const escalateRunInputSchema = z.object({
+  runId: z.string().min(1),
+  reason: z.string().trim().min(1).max(300).optional()
+});
+
 export interface HarborApiDependencies {
   runWorkflow(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<WorkflowRunResult>;
+  listRuns(context: HarborApiContext, input: ListRunsInput): Promise<RunSummary[]>;
+  getRun(context: HarborApiContext, runId: string): Promise<RunDetail | null>;
+  escalateRun(
+    context: HarborApiContext,
+    input: {
+      runId: string;
+      reason: string;
+    }
+  ): Promise<{
+    runId: string;
+    status: RunStatus;
+    updatedAt: string;
+  } | null>;
 }
 
 const t = initTRPC.context<HarborApiContext>().create();
@@ -115,6 +149,46 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
       };
 
       return dependencies.runWorkflow(runRequest, input.workflow);
+    }),
+
+    listRuns: authzProcedure.input(listRunsInputSchema).query(async ({ ctx, input }) => {
+      return dependencies.listRuns(ctx, input);
+    }),
+
+    getRun: authzProcedure.input(getRunInputSchema).query(async ({ ctx, input }) => {
+      const run = await dependencies.getRun(ctx, input.runId);
+      if (!run) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Run not found"
+        });
+      }
+
+      return run;
+    }),
+
+    escalateRun: authzProcedure.input(escalateRunInputSchema).mutation(async ({ ctx, input }) => {
+      const reason = input.reason ?? "Manual escalation requested by operator.";
+      const result = await dependencies.escalateRun(ctx, {
+        runId: input.runId,
+        reason
+      });
+
+      if (!result) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Run not found"
+        });
+      }
+
+      if (result.status !== "needs_human") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Escalation did not produce needs_human status"
+        });
+      }
+
+      return result;
     })
   });
 }

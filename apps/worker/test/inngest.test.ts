@@ -68,4 +68,12 @@ describe("worker exports", () => {
     const module = await import("../src/inngest.js");
     expect(module.workflowRunRequested).toBeDefined();
   });
+
+  it("initializes with postgres run persistence branch when DATABASE_URL is set", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://harbor:harbor@localhost:5432/harbor");
+    const module = await import("../src/inngest.js");
+
+    expect(module.inngest).toBeDefined();
+    expect(module.functions.length).toBeGreaterThan(0);
+  });
 });

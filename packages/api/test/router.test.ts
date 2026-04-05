@@ -51,6 +51,55 @@ function createRouter(overrides?: Partial<HarborApiDependencies>) {
         }
       };
     },
+    async listRuns() {
+      return [
+        {
+          runId: "run_1",
+          workflowId: "wf_1",
+          status: "completed",
+          trigger: "manual",
+          actorId: "user_1",
+          createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          updatedAt: new Date("2026-01-01T00:01:00.000Z").toISOString(),
+          tokenUsage: {
+            inputTokens: 10,
+            outputTokens: 5,
+            totalTokens: 15,
+            estimatedCostUsd: 0.00015
+          }
+        }
+      ];
+    },
+    async getRun() {
+      return {
+        runId: "run_1",
+        workflowId: "wf_1",
+        status: "completed",
+        trigger: "manual",
+        actorId: "user_1",
+        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        updatedAt: new Date("2026-01-01T00:01:00.000Z").toISOString(),
+        tokenUsage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          totalTokens: 15,
+          estimatedCostUsd: 0.00015
+        },
+        input: { prompt: "hello" },
+        output: { ok: true },
+        details: { ok: true },
+        lintFindings: [],
+        stages: [],
+        artifacts: {}
+      };
+    },
+    async escalateRun(_context, input) {
+      return {
+        runId: input.runId,
+        status: "needs_human",
+        updatedAt: new Date("2026-01-01T00:02:00.000Z").toISOString()
+      };
+    },
     ...overrides
   };
 
@@ -161,6 +210,89 @@ describe("createHarborRouter", () => {
       actorId: scopedContext.actorId,
       workflowId: workflow.id,
       trigger: "manual"
+    });
+  });
+
+  it("returns runs list scoped to tenant context", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.listRuns({
+      limit: 10
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].runId).toBe("run_1");
+  });
+
+  it("returns run detail and handles not found", async () => {
+    const router = createRouter({
+      async getRun() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(caller.getRun({ runId: "missing" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
+  it("returns run detail when dependencies provide data", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const run = await caller.getRun({ runId: "run_1" });
+    expect(run.runId).toBe("run_1");
+    expect(run.tokenUsage.totalTokens).toBe(15);
+  });
+
+  it("escalates a run and applies default reason when omitted", async () => {
+    const calls: Array<{ runId: string; reason?: string | undefined }> = [];
+    const router = createRouter({
+      async escalateRun(_context, input) {
+        calls.push(input);
+        return {
+          runId: input.runId,
+          status: "needs_human",
+          updatedAt: new Date("2026-01-01T00:02:00.000Z").toISOString()
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.escalateRun({ runId: "run_1" });
+    expect(result.status).toBe("needs_human");
+    expect(calls[0]?.reason).toContain("Manual escalation requested");
+  });
+
+  it("rejects escalate if dependencies return non-escalated status", async () => {
+    const router = createRouter({
+      async escalateRun(_context, input) {
+        return {
+          runId: input.runId,
+          status: "failed",
+          updatedAt: new Date("2026-01-01T00:02:00.000Z").toISOString()
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(caller.escalateRun({ runId: "run_1", reason: "Need operator review" })).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR"
+    });
+  });
+
+  it("rejects escalate with not found when dependencies return null", async () => {
+    const router = createRouter({
+      async escalateRun() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(caller.escalateRun({ runId: "missing", reason: "none" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
     });
   });
 });

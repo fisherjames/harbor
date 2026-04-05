@@ -27,4 +27,14 @@ describe("dependency memu resolution", () => {
     const router = getAppRouter();
     expect(router).toBeDefined();
   });
+
+  it("builds router with postgres run-store branch when DATABASE_URL is set", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://harbor:harbor@localhost:5432/harbor");
+
+    const { getAppRouter, resetRouterForTests } = await import("../src/server/dependencies");
+    resetRouterForTests();
+
+    const router = getAppRouter();
+    expect(router).toBeDefined();
+  });
 });
