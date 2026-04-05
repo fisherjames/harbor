@@ -23,11 +23,23 @@ export interface ModelProvider {
   generate(input: ModelInvocation): Promise<ModelInvocationResult>;
 }
 
+export interface IdempotentRunLookupResult {
+  runId: string;
+  status: RunStatus;
+  details?: Record<string, unknown> | undefined;
+}
+
 export interface RunPersistence {
   createRun(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<string>;
-  updateStatus(runId: string, status: RunStatus, details?: Record<string, unknown>): Promise<void>;
+  resolveIdempotentRun?(request: WorkflowRunRequest): Promise<IdempotentRunLookupResult | null>;
+  updateStatus(
+    runId: string,
+    status: RunStatus,
+    details?: Record<string, unknown>,
+    transitionKey?: string
+  ): Promise<void>;
   addLintFindings(runId: string, findings: LintFinding[]): Promise<void>;
-  appendStage(runId: string, record: StageExecutionRecord): Promise<void>;
+  appendStage(runId: string, record: StageExecutionRecord, transitionKey?: string): Promise<void>;
   storeArtifact(runId: string, name: string, value: string): Promise<void>;
 }
 

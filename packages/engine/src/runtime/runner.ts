@@ -68,6 +68,14 @@ function verifyPassed(output: string): boolean {
   return normalized.includes("PASS") && !normalized.includes("FAIL");
 }
 
+function statusTransitionKey(status: RunStatus, reason?: string): string {
+  if (!reason) {
+    return `status:${status}`;
+  }
+
+  return `status:${status}:${reason}`;
+}
+
 async function readMemoryContext(
   stage: RunStage,
   context: RunContext,
@@ -128,7 +136,8 @@ async function runSingleStage(
   stage: RunStage,
   context: RunContext,
   dependencies: WorkflowRunnerDependencies,
-  nonBlockingFindings: ReturnType<typeof filterFindingsForPrompt>
+  nonBlockingFindings: ReturnType<typeof filterFindingsForPrompt>,
+  stageTransitionKey: string
 ): Promise<string> {
   const startedAt = new Date().toISOString();
   const nodeType = stageNodeType(stage);
@@ -185,7 +194,7 @@ async function runSingleStage(
     ...(execution.value.tokenUsage ? { tokenUsage: execution.value.tokenUsage } : {})
   };
 
-  await dependencies.persistence.appendStage(context.runId, stageRecord);
+  await dependencies.persistence.appendStage(context.runId, stageRecord, stageTransitionKey);
 
   await writeMemory(stage, execution.value.output, context, dependencies);
 
@@ -209,9 +218,29 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
 
   return {
     async runWorkflow(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<WorkflowRunResult> {
+      if (request.idempotencyKey && dependencies.persistence.resolveIdempotentRun) {
+        const deduped = await dependencies.persistence.resolveIdempotentRun(request);
+        if (deduped) {
+          dependencies.tracer.finding({
+            runId: deduped.runId,
+            workflowId: workflow.id,
+            message: "Idempotent run request deduplicated",
+            metadata: {
+              status: deduped.status
+            }
+          });
+
+          return {
+            runId: deduped.runId,
+            status: deduped.status,
+            ...(deduped.details ? { finalOutput: deduped.details } : {})
+          };
+        }
+      }
+
       const runId = await dependencies.persistence.createRun(request, workflow);
 
-      await dependencies.persistence.updateStatus(runId, "running");
+      await dependencies.persistence.updateStatus(runId, "running", undefined, statusTransitionKey("running"));
 
       const context: RunContext = {
         request,
@@ -220,6 +249,11 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
       };
       let isolationSession: RunIsolationSession | undefined;
       let outcome: RunStatus = "running";
+      let stageTransitionIndex = 0;
+      const nextStageTransitionKey = (stage: RunStage): string => {
+        stageTransitionIndex += 1;
+        return `stage:${stage}:${stageTransitionIndex}`;
+      };
       const teardownIsolation = async (): Promise<void> => {
         if (!isolationSession) {
           return;
@@ -262,7 +296,7 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           await dependencies.persistence.updateStatus(runId, "failed", {
             reason: "run_isolation_setup_failed",
             detail: err.message
-          });
+          }, statusTransitionKey("failed", "run_isolation_setup_failed"));
           await teardownIsolation();
 
           return {
@@ -301,7 +335,7 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           outcome = "failed";
           await dependencies.persistence.updateStatus(runId, "failed", {
             reason: "critical_lint_findings"
-          });
+          }, statusTransitionKey("failed", "critical_lint_findings"));
           await teardownIsolation();
 
           return {
@@ -321,9 +355,27 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           await dependencies.persistence.storeArtifact(runId, "harness-resolution-steps", JSON.stringify(resolutionSteps));
         }
 
-        await runSingleStage("plan", context, dependencies, nonBlockingFindings);
-        const executeOutput = await runSingleStage("execute", context, dependencies, nonBlockingFindings);
-        let verifyOutput = await runSingleStage("verify", context, dependencies, nonBlockingFindings);
+        await runSingleStage(
+          "plan",
+          context,
+          dependencies,
+          nonBlockingFindings,
+          nextStageTransitionKey("plan")
+        );
+        const executeOutput = await runSingleStage(
+          "execute",
+          context,
+          dependencies,
+          nonBlockingFindings,
+          nextStageTransitionKey("execute")
+        );
+        let verifyOutput = await runSingleStage(
+          "verify",
+          context,
+          dependencies,
+          nonBlockingFindings,
+          nextStageTransitionKey("verify")
+        );
 
         if (!verifyPassed(verifyOutput)) {
           for (let fixAttempt = 0; fixAttempt < maxFixAttempts; fixAttempt += 1) {
@@ -333,8 +385,20 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
               verifyOutput
             );
 
-            await runSingleStage("fix", context, dependencies, nonBlockingFindings);
-            verifyOutput = await runSingleStage("verify", context, dependencies, nonBlockingFindings);
+            await runSingleStage(
+              "fix",
+              context,
+              dependencies,
+              nonBlockingFindings,
+              nextStageTransitionKey("fix")
+            );
+            verifyOutput = await runSingleStage(
+              "verify",
+              context,
+              dependencies,
+              nonBlockingFindings,
+              nextStageTransitionKey("verify")
+            );
 
             if (verifyPassed(verifyOutput)) {
               break;
@@ -346,7 +410,7 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           outcome = "needs_human";
           await dependencies.persistence.updateStatus(runId, "needs_human", {
             reason: "verification_failed"
-          });
+          }, statusTransitionKey("needs_human", "verification_failed"));
           await teardownIsolation();
 
           return {
@@ -372,7 +436,7 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           JSON.stringify(generateRemediationRecommendations(postRunSummary))
         );
 
-        await dependencies.persistence.updateStatus(runId, "completed");
+        await dependencies.persistence.updateStatus(runId, "completed", undefined, statusTransitionKey("completed"));
         outcome = "completed";
         await teardownIsolation();
 
@@ -396,7 +460,7 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
 
         await dependencies.persistence.updateStatus(runId, "failed", {
           reason: err.message
-        });
+        }, statusTransitionKey("failed", "runtime_error"));
         outcome = "failed";
         await teardownIsolation();
 

@@ -22,4 +22,5 @@ Harbor is a standalone TypeScript agent orchestration platform with harness-firs
 ## Delivery Discipline
 - New behavior requires at least one success-path and one failure-path test.
 - Architectural decisions that change contracts must add/update an ADR in `docs/architecture/decision-records`.
+- Milestone/phase changes must update `docs/getting-started.md` cadence metadata and pass `pnpm docs:check`.
 - When proposing run-runtime architecture, always include worktree isolation and ephemeral observability recommendations.

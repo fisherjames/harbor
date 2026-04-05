@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "requiredDocuments": [
+    "docs/getting-started.md"
+  ],
+  "gettingStarted": {
+    "metadataStart": "<!-- DOCS_CADENCE_METADATA_BEGIN -->",
+    "metadataEnd": "<!-- DOCS_CADENCE_METADATA_END -->",
+    "requiredHeadings": [
+      "# Harbor Getting Started",
+      "## Quick Start",
+      "## Harness + Docs Cadence",
+      "## Milestone Verification",
+      "## Phase Evidence Map"
+    ],
+    "requiredCommands": [
+      "pnpm check",
+      "pnpm vision:check",
+      "pnpm docs:check"
+    ],
+    "requiredPhrases": [
+      "worktree-bound",
+      "ephemeral observability",
+      "idempotency key",
+      "Harness Resolution Steps"
+    ]
+  }
+}

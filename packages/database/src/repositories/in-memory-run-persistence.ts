@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { LintFinding, WorkflowDefinition } from "@harbor/harness";
-import type { RunStatus, StageExecutionRecord, WorkflowRunRequest } from "@harbor/engine";
+import type {
+  IdempotentRunLookupResult,
+  RunStatus,
+  StageExecutionRecord,
+  WorkflowRunRequest
+} from "@harbor/engine";
 import type {
   EscalateRunInput,
   ListRunsInput,
@@ -21,14 +26,46 @@ interface RunRecord {
   lintFindings: LintFinding[];
   stages: StageExecutionRecord[];
   artifacts: Record<string, string>;
+  statusTransitionKeys: Set<string>;
+  stageTransitionKeys: Set<string>;
   createdAt: string;
   updatedAt: string;
 }
 
 export class InMemoryRunPersistence implements RunStore {
   private readonly runs = new Map<string, RunRecord>();
+  private readonly runIdempotencyIndex = new Map<string, string>();
+
+  async resolveIdempotentRun(request: WorkflowRunRequest): Promise<IdempotentRunLookupResult | null> {
+    const idempotencyKey = this.idempotencyScopeKey(request);
+    if (!idempotencyKey) {
+      return null;
+    }
+
+    const runId = this.runIdempotencyIndex.get(idempotencyKey);
+    if (!runId) {
+      return null;
+    }
+
+    const run = this.runs.get(runId);
+    if (!run) {
+      this.runIdempotencyIndex.delete(idempotencyKey);
+      return null;
+    }
+
+    return {
+      runId,
+      status: run.status,
+      details: run.details
+    };
+  }
 
   async createRun(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<string> {
+    const existing = await this.resolveIdempotentRun(request);
+    if (existing) {
+      return existing.runId;
+    }
+
     const now = new Date().toISOString();
     const runId = `run_${randomUUID()}`;
     this.runs.set(runId, {
@@ -40,15 +77,35 @@ export class InMemoryRunPersistence implements RunStore {
       lintFindings: [],
       stages: [],
       artifacts: {},
+      statusTransitionKeys: new Set<string>(),
+      stageTransitionKeys: new Set<string>(),
       createdAt: now,
       updatedAt: now
     });
 
+    const idempotencyKey = this.idempotencyScopeKey(request);
+    if (idempotencyKey) {
+      this.runIdempotencyIndex.set(idempotencyKey, runId);
+    }
+
     return runId;
   }
 
-  async updateStatus(runId: string, status: RunStatus, details?: Record<string, unknown>): Promise<void> {
+  async updateStatus(
+    runId: string,
+    status: RunStatus,
+    details?: Record<string, unknown>,
+    transitionKey?: string
+  ): Promise<void> {
     const run = this.getRunRecord(runId);
+    if (transitionKey && run.statusTransitionKeys.has(transitionKey)) {
+      return;
+    }
+
+    if (transitionKey) {
+      run.statusTransitionKeys.add(transitionKey);
+    }
+
     run.status = status;
     run.details = details;
     run.updatedAt = new Date().toISOString();
@@ -60,8 +117,16 @@ export class InMemoryRunPersistence implements RunStore {
     run.updatedAt = new Date().toISOString();
   }
 
-  async appendStage(runId: string, record: StageExecutionRecord): Promise<void> {
+  async appendStage(runId: string, record: StageExecutionRecord, transitionKey?: string): Promise<void> {
     const run = this.getRunRecord(runId);
+    if (transitionKey && run.stageTransitionKeys.has(transitionKey)) {
+      return;
+    }
+
+    if (transitionKey) {
+      run.stageTransitionKeys.add(transitionKey);
+    }
+
     run.stages.push(record);
     run.updatedAt = new Date().toISOString();
   }
@@ -166,5 +231,14 @@ export class InMemoryRunPersistence implements RunStore {
     }
 
     return run;
+  }
+
+  private idempotencyScopeKey(request: WorkflowRunRequest): string | null {
+    const key = request.idempotencyKey?.trim();
+    if (!key) {
+      return null;
+    }
+
+    return `${request.tenantId}:${request.workspaceId}:${request.workflowId}:${key}`;
   }
 }

@@ -20,7 +20,8 @@
         "apps/web/app/workflows/[workflowId]/builder/page.tsx",
         "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
         "packages/api/src/router.ts",
-        "packages/database/src/repositories/workflow-registry.ts"
+        "packages/database/src/repositories/workflow-registry.ts",
+        "docs/getting-started.md"
       ]
     },
     {

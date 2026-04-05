@@ -455,6 +455,33 @@ describe("createHarborRouter", () => {
     });
   });
 
+  it("forwards optional idempotency key when provided", async () => {
+    const calls: WorkflowRunRequest[] = [];
+
+    const router = createRouter({
+      async runWorkflow(request) {
+        calls.push(request);
+        return {
+          runId: "run_idempotent",
+          status: "completed"
+        };
+      }
+    });
+
+    const caller = router.createCaller(scopedContext);
+
+    await caller.runWorkflow({
+      workflow,
+      trigger: "manual",
+      input: {
+        prompt: "hello"
+      },
+      idempotencyKey: "idem-1"
+    });
+
+    expect(calls[0]?.idempotencyKey).toBe("idem-1");
+  });
+
   it("returns runs list scoped to tenant context", async () => {
     const router = createRouter();
     const caller = router.createCaller(scopedContext);

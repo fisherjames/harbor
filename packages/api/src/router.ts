@@ -65,7 +65,8 @@ const saveInputSchema = z.object({
 const runInputSchema = z.object({
   workflow: workflowSchema,
   trigger: z.enum(["manual", "schedule", "api"]).default("manual"),
-  input: z.record(z.unknown())
+  input: z.record(z.unknown()),
+  idempotencyKey: z.string().trim().min(1).max(128).optional()
 });
 
 const workflowVersionStateSchema = z.enum(["draft", "published"]);
@@ -281,7 +282,8 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
         actorId: ctx.actorId,
         workflowId: input.workflow.id,
         trigger: input.trigger,
-        input: input.input
+        input: input.input,
+        idempotencyKey: input.idempotencyKey
       };
 
       return dependencies.runWorkflow(runRequest, input.workflow);

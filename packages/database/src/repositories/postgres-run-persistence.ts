@@ -1,7 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import type { LintFinding, WorkflowDefinition } from "@harbor/harness";
-import type { RunStatus, StageExecutionRecord, WorkflowRunRequest } from "@harbor/engine";
+import type {
+  IdempotentRunLookupResult,
+  RunStatus,
+  StageExecutionRecord,
+  WorkflowRunRequest
+} from "@harbor/engine";
 import type {
   EscalateRunInput,
   ListRunsInput,
@@ -49,6 +54,44 @@ interface ArtifactRow {
   value: string;
 }
 
+function hashToken(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 24);
+}
+
+function runIdFromScopedIdempotencyKey(scopedIdempotencyKey: string): string {
+  return `run_${hashToken(scopedIdempotencyKey)}`;
+}
+
+function stageIdFromTransitionKey(runId: string, transitionKey: string): string {
+  return `stage_${hashToken(`${runId}:${transitionKey}`)}`;
+}
+
+function statusTransitionMarkerName(transitionKey: string): string {
+  return `__idempotency_status_${hashToken(transitionKey)}`;
+}
+
+function scopedIdempotencyKey(request: WorkflowRunRequest): string | null {
+  const key = request.idempotencyKey?.trim();
+  if (!key) {
+    return null;
+  }
+
+  return `${request.tenantId}:${request.workspaceId}:${request.workflowId}:${key}`;
+}
+
+function isInternalArtifact(name: string): boolean {
+  return name.startsWith("__");
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { code?: unknown };
+  return candidate.code === "23505";
+}
+
 function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -89,27 +132,71 @@ function parseTokenUsage(value: unknown): StageExecutionRecord["tokenUsage"] {
 export class PostgresRunPersistence implements RunStore {
   constructor(private readonly db: Queryable) {}
 
-  async createRun(request: WorkflowRunRequest, _workflow: WorkflowDefinition): Promise<string> {
-    const runId = `run_${randomUUID()}`;
-    await this.db.query(
-      `INSERT INTO executions (id, workflow_id, tenant_id, workspace_id, status, trigger, actor_id, input)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
-      [
-        runId,
-        request.workflowId,
-        request.tenantId,
-        request.workspaceId,
-        "queued",
-        request.trigger,
-        request.actorId,
-        JSON.stringify(request.input)
-      ]
+  async resolveIdempotentRun(request: WorkflowRunRequest): Promise<IdempotentRunLookupResult | null> {
+    const scopedKey = scopedIdempotencyKey(request);
+    if (!scopedKey) {
+      return null;
+    }
+
+    const runId = runIdFromScopedIdempotencyKey(scopedKey);
+    const result = await this.db.query<ExecutionRow>(
+      `SELECT id, workflow_id, status, trigger, actor_id, input, output, created_at, updated_at
+       FROM executions
+       WHERE id = $1 AND tenant_id = $2 AND workspace_id = $3`,
+      [runId, request.tenantId, request.workspaceId]
     );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      runId: row.id,
+      status: row.status,
+      details: parseJsonRecord(row.output)
+    };
+  }
+
+  async createRun(request: WorkflowRunRequest, _workflow: WorkflowDefinition): Promise<string> {
+    const scopedKey = scopedIdempotencyKey(request);
+    const runId = scopedKey ? runIdFromScopedIdempotencyKey(scopedKey) : `run_${randomUUID()}`;
+
+    try {
+      await this.db.query(
+        `INSERT INTO executions (id, workflow_id, tenant_id, workspace_id, status, trigger, actor_id, input)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+        [
+          runId,
+          request.workflowId,
+          request.tenantId,
+          request.workspaceId,
+          "queued",
+          request.trigger,
+          request.actorId,
+          JSON.stringify(request.input)
+        ]
+      );
+    } catch (error) {
+      if (!scopedKey || !isUniqueViolation(error)) {
+        throw error;
+      }
+    }
 
     return runId;
   }
 
-  async updateStatus(runId: string, status: RunStatus, details?: Record<string, unknown>): Promise<void> {
+  async updateStatus(
+    runId: string,
+    status: RunStatus,
+    details?: Record<string, unknown>,
+    transitionKey?: string
+  ): Promise<void> {
+    const markerName = transitionKey ? statusTransitionMarkerName(transitionKey) : undefined;
+    if (markerName && (await this.hasTransitionMarker(runId, markerName))) {
+      return;
+    }
+
     const detailsJson = details ? JSON.stringify(details) : null;
     const result = await this.db.query(
       `UPDATE executions
@@ -123,29 +210,43 @@ export class PostgresRunPersistence implements RunStore {
     if (result.rowCount === 0) {
       throw new Error(`Unknown runId: ${runId}`);
     }
+
+    if (markerName) {
+      await this.recordTransitionMarker(runId, markerName);
+    }
   }
 
   async addLintFindings(runId: string, findings: LintFinding[]): Promise<void> {
     await this.storeArtifact(runId, "__lint-findings", JSON.stringify(findings));
   }
 
-  async appendStage(runId: string, record: StageExecutionRecord): Promise<void> {
-    await this.db.query(
-      `INSERT INTO execution_stages
-       (id, execution_id, stage, prompt, output, attempts, token_usage, started_at, completed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::timestamptz, $9::timestamptz)`,
-      [
-        `stage_${randomUUID()}`,
-        runId,
-        record.stage,
-        record.prompt,
-        record.output,
-        record.attempts,
-        record.tokenUsage ? JSON.stringify(record.tokenUsage) : null,
-        record.startedAt,
-        record.completedAt
-      ]
-    );
+  async appendStage(runId: string, record: StageExecutionRecord, transitionKey?: string): Promise<void> {
+    const stageId = transitionKey ? stageIdFromTransitionKey(runId, transitionKey) : `stage_${randomUUID()}`;
+
+    try {
+      await this.db.query(
+        `INSERT INTO execution_stages
+         (id, execution_id, stage, prompt, output, attempts, token_usage, started_at, completed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::timestamptz, $9::timestamptz)`,
+        [
+          stageId,
+          runId,
+          record.stage,
+          record.prompt,
+          record.output,
+          record.attempts,
+          record.tokenUsage ? JSON.stringify(record.tokenUsage) : null,
+          record.startedAt,
+          record.completedAt
+        ]
+      );
+    } catch (error) {
+      if (!transitionKey || !isUniqueViolation(error)) {
+        throw error;
+      }
+
+      return;
+    }
 
     await this.db.query("UPDATE executions SET updated_at = NOW() WHERE id = $1", [runId]);
   }
@@ -269,13 +370,16 @@ export class PostgresRunPersistence implements RunStore {
       };
     });
 
-    const artifactMap = artifacts.rows.reduce<Record<string, string>>(
-      (acc, artifact) => ({
+    const artifactMap = artifacts.rows.reduce<Record<string, string>>((acc, artifact) => {
+      if (isInternalArtifact(artifact.name)) {
+        return acc;
+      }
+
+      return {
         ...acc,
         [artifact.name]: artifact.value
-      }),
-      {}
-    );
+      };
+    }, {});
 
     return {
       runId: row.id,
@@ -345,6 +449,28 @@ export class PostgresRunPersistence implements RunStore {
       status: "needs_human",
       updatedAt
     };
+  }
+
+  private async hasTransitionMarker(runId: string, markerName: string): Promise<boolean> {
+    const result = await this.db.query<{ marker: number }>(
+      `SELECT 1 AS marker
+       FROM artifacts
+       WHERE execution_id = $1 AND name = $2
+       LIMIT 1`,
+      [runId, markerName]
+    );
+
+    return result.rowCount > 0;
+  }
+
+  private async recordTransitionMarker(runId: string, markerName: string): Promise<void> {
+    await this.db.query(
+      `INSERT INTO artifacts (id, execution_id, name, value)
+       VALUES ($1, $2, $3, $4)`,
+      [`artifact_${randomUUID()}`, runId, markerName, "1"]
+    );
+
+    await this.db.query("UPDATE executions SET updated_at = NOW() WHERE id = $1", [runId]);
   }
 }
 

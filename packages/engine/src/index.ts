@@ -7,6 +7,7 @@ export type {
   RunContext
 } from "./contracts/types.js";
 export type {
+  IdempotentRunLookupResult,
   ModelInvocation,
   ModelInvocationResult,
   ModelProvider,

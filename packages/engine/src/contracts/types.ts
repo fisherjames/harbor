@@ -10,6 +10,7 @@ export interface WorkflowRunRequest {
   trigger: "manual" | "schedule" | "api";
   input: Record<string, unknown>;
   actorId: string;
+  idempotencyKey?: string | undefined;
 }
 
 export interface WorkflowRunResult {

@@ -10,8 +10,9 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "vision:check": "node ./scripts/vision-drift-check.mjs",
+    "docs:check": "node ./scripts/docs-drift-check.mjs",
     "clean": "turbo run clean",
-    "check": "pnpm vision:check && pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm vision:check && pnpm docs:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

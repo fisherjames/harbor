@@ -158,13 +158,81 @@ describe("InMemoryRunPersistence", () => {
     await expect(persistence.updateStatus("missing", "running")).rejects.toThrow("Unknown runId");
     await expect(persistence.getRun({ tenantId: "t", workspaceId: "w" }, "missing")).resolves.toBeNull();
   });
+
+  it("deduplicates run starts and transition keys when idempotency keys are reused", async () => {
+    const persistence = new InMemoryRunPersistence();
+
+    const idempotentRequest: WorkflowRunRequest = {
+      ...request,
+      idempotencyKey: "idem-1"
+    };
+
+    const runId = await persistence.createRun(idempotentRequest, workflow);
+    const secondRunId = await persistence.createRun(idempotentRequest, workflow);
+    expect(secondRunId).toBe(runId);
+
+    const resolved = await persistence.resolveIdempotentRun?.(idempotentRequest);
+    expect(resolved?.runId).toBe(runId);
+    expect(resolved?.status).toBe("queued");
+
+    await persistence.updateStatus(runId, "running", { started: true }, "status:running");
+    await persistence.updateStatus(runId, "failed", { should: "skip" }, "status:running");
+
+    await persistence.appendStage(
+      runId,
+      {
+        stage: "plan",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:01.000Z",
+        prompt: "p",
+        output: "o",
+        attempts: 1,
+        lintFindings: []
+      },
+      "stage:plan:1"
+    );
+    await persistence.appendStage(
+      runId,
+      {
+        stage: "plan",
+        startedAt: "2026-01-01T00:00:02.000Z",
+        completedAt: "2026-01-01T00:00:03.000Z",
+        prompt: "p2",
+        output: "o2",
+        attempts: 1,
+        lintFindings: []
+      },
+      "stage:plan:1"
+    );
+
+    const snapshot = persistence.getSnapshot(runId);
+    expect(snapshot.status).toBe("running");
+    expect(snapshot.details).toEqual({ started: true });
+    expect(snapshot.stages).toHaveLength(1);
+  });
+
+  it("cleans stale idempotency index entries when run records disappear", async () => {
+    const persistence = new InMemoryRunPersistence();
+    const idempotentRequest: WorkflowRunRequest = {
+      ...request,
+      idempotencyKey: "idem-stale"
+    };
+
+    const runId = await persistence.createRun(idempotentRequest, workflow);
+    ((persistence as unknown as { runs: Map<string, unknown> }).runs).delete(runId);
+
+    const resolved = await persistence.resolveIdempotentRun?.(idempotentRequest);
+    expect(resolved).toBeNull();
+  });
 });
+
+type FakeDbResult = { rows: unknown[]; rowCount: number } | { error: unknown };
 
 class FakeDb {
   public calls: Array<{ text: string; values?: unknown[] }> = [];
-  private readonly queue: Array<{ rows: unknown[]; rowCount: number }>;
+  private readonly queue: FakeDbResult[];
 
-  constructor(queue: Array<{ rows: unknown[]; rowCount: number }>) {
+  constructor(queue: FakeDbResult[]) {
     this.queue = [...queue];
   }
 
@@ -174,6 +242,11 @@ class FakeDb {
   ): Promise<{ rows: Row[]; rowCount: number }> {
     this.calls.push({ text, values });
     const next = this.queue.shift() ?? { rows: [], rowCount: 1 };
+
+    if ("error" in next) {
+      throw next.error;
+    }
+
     return {
       rows: next.rows as Row[],
       rowCount: next.rowCount
@@ -261,6 +334,85 @@ describe("PostgresRunPersistence", () => {
     expect(db.calls.some((call) => call.text.includes("FROM executions"))).toBe(true);
   });
 
+  it("resolves idempotent runs using scoped idempotency key lookup", async () => {
+    const db = new FakeDb([
+      {
+        rows: [
+          {
+            id: "run_from_idempotency",
+            workflow_id: "wf_1",
+            status: "running",
+            trigger: "manual",
+            actor_id: "u",
+            input: {},
+            output: "{\"partial\":true}",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:30.000Z"
+          }
+        ],
+        rowCount: 1
+      }
+    ]);
+
+    const persistence = new PostgresRunPersistence(db);
+    const found = await persistence.resolveIdempotentRun({
+      ...request,
+      idempotencyKey: "idem-lookup"
+    });
+
+    expect(found).toEqual({
+      runId: "run_from_idempotency",
+      status: "running",
+      details: { partial: true }
+    });
+    expect((db.calls[0]?.values?.[0] as string).startsWith("run_")).toBe(true);
+
+    const missing = await persistence.resolveIdempotentRun({
+      ...request,
+      idempotencyKey: "idem-missing"
+    });
+    expect(missing).toBeNull();
+  });
+
+  it("skips idempotent lookup when idempotency key is absent", async () => {
+    const db = new FakeDb([]);
+    const persistence = new PostgresRunPersistence(db);
+
+    const found = await persistence.resolveIdempotentRun(request);
+    expect(found).toBeNull();
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it("handles idempotent createRun duplicate-key conflicts and throws on non-idempotent insert failures", async () => {
+    const duplicateDb = new FakeDb([{ error: { code: "23505" } }]);
+    const duplicatePersistence = new PostgresRunPersistence(duplicateDb);
+
+    const dedupedRunId = await duplicatePersistence.createRun(
+      {
+        ...request,
+        idempotencyKey: "idem-create"
+      },
+      workflow
+    );
+    expect(dedupedRunId.startsWith("run_")).toBe(true);
+
+    const failingDb = new FakeDb([{ error: new Error("insert failed") }]);
+    const failingPersistence = new PostgresRunPersistence(failingDb);
+    await expect(failingPersistence.createRun(request, workflow)).rejects.toThrow("insert failed");
+
+    const malformedErrorDb = new FakeDb([{ error: "string-error" }]);
+    const malformedErrorPersistence = new PostgresRunPersistence(malformedErrorDb);
+    await expect(
+      malformedErrorPersistence.createRun(
+        {
+          ...request,
+          idempotencyKey: "idem-non-object-error"
+        },
+        workflow
+      )
+    ).rejects.toBe("string-error");
+  });
+
   it("updates status with details and appends stages without token usage", async () => {
     const db = new FakeDb([
       { rows: [], rowCount: 1 }, // update status
@@ -281,6 +433,61 @@ describe("PostgresRunPersistence", () => {
     });
 
     expect(db.calls.length).toBe(3);
+  });
+
+  it("deduplicates updateStatus transitions using transition markers", async () => {
+    const db = new FakeDb([
+      { rows: [], rowCount: 0 }, // first marker lookup
+      { rows: [], rowCount: 1 }, // first update
+      { rows: [], rowCount: 1 }, // marker insert
+      { rows: [], rowCount: 1 }, // marker touch execution updated_at
+      { rows: [], rowCount: 1 } // second marker lookup -> already consumed
+    ]);
+
+    const persistence = new PostgresRunPersistence(db);
+    await persistence.updateStatus("run_1", "running", { started: true }, "status:running");
+    await persistence.updateStatus("run_1", "failed", { should: "skip" }, "status:running");
+
+    expect(db.calls.filter((call) => call.text.includes("UPDATE executions")).length).toBe(2);
+  });
+
+  it("deduplicates appendStage by transition key and rejects non-unique insert failures", async () => {
+    const duplicateDb = new FakeDb([{ error: { code: "23505" } }]);
+    const duplicatePersistence = new PostgresRunPersistence(duplicateDb);
+
+    await expect(
+      duplicatePersistence.appendStage(
+        "run_1",
+        {
+          stage: "plan",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:01.000Z",
+          prompt: "p",
+          output: "o",
+          attempts: 1,
+          lintFindings: []
+        },
+        "stage:plan:1"
+      )
+    ).resolves.toBeUndefined();
+
+    const failingDb = new FakeDb([{ error: new Error("stage insert failed") }]);
+    const failingPersistence = new PostgresRunPersistence(failingDb);
+    await expect(
+      failingPersistence.appendStage(
+        "run_1",
+        {
+          stage: "plan",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:01.000Z",
+          prompt: "p",
+          output: "o",
+          attempts: 1,
+          lintFindings: []
+        },
+        "stage:plan:1"
+      )
+    ).rejects.toThrow("stage insert failed");
   });
 
   it("gets run details, handles JSON parsing variants, and escalates runs", async () => {
