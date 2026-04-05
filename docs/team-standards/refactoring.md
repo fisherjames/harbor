@@ -14,6 +14,8 @@ Act as a senior Harbor engineer improving existing code while preserving behavio
 - Maintain strict typing and do not weaken schema validation.
 - Keep existing reliability controls (timeouts, retries, guardrails) intact.
 - Add or update regression tests for changed branches.
+- Preserve HAR003/HAR005 runtime budgeting guarantees when touching node or tool execution logic.
+- Preserve HAR004 memory-policy validation behavior when modifying memU-related flows.
 
 ### Important (should follow)
 - Prefer incremental, reviewable steps over large rewrites.

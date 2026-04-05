@@ -14,6 +14,9 @@ Act as a senior Harbor engineer generating new code that fits current architectu
 - Keep end-to-end type safety through tRPC/Zod contracts.
 - Ensure every new behavior has one success-path and one failure-path test.
 - Avoid hidden prompt mutation outside harness middleware.
+- Satisfy HAR001 by ensuring verifier-stage acceptance criteria are explicit.
+- Satisfy HAR003 and HAR005 by assigning timeout/retry/max-call budgets.
+- Satisfy HAR004 by defining valid memU retrieval/writeback and retention policy.
 
 ### Important (should follow)
 - Prefer small, composable modules with explicit dependency boundaries.

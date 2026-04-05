@@ -6,7 +6,8 @@
     "docs/team-standards/refactoring.md",
     "docs/team-standards/security.md",
     "docs/team-standards/review.md",
-    "docs/team-standards/calibration.md"
+    "docs/team-standards/calibration.md",
+    "docs/team-standards/har-rule-coverage.json"
   ],
   "forbiddenPatterns": [
     "~/.cursor",
@@ -50,6 +51,7 @@
       "`security.md`",
       "`review.md`",
       "`calibration.md`",
+      "`har-rule-coverage.json`",
       "pnpm standards:check"
     ]
   },
@@ -64,5 +66,16 @@
     ],
     "historyEntryPattern": "\\d{4}-\\d{2}-\\d{2}:",
     "historyMinimumEntries": 1
+  },
+  "harRuleCoverage": {
+    "visionContractFile": "docs/strategy/vision-contract.json",
+    "linterSourceFile": "packages/harness/src/linter.ts",
+    "matrixFile": "docs/team-standards/har-rule-coverage.json",
+    "requiredEntryKeys": [
+      "ruleId",
+      "templateTarget",
+      "standardFiles",
+      "summary"
+    ]
   }
 }

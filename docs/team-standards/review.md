@@ -13,6 +13,7 @@ Act as a Harbor reviewer enforcing architecture, reliability, and safety expecta
 - Call out behavioral regressions or contract breaks first.
 - Ensure critical harness/security gates are not bypassed.
 - Verify tests cover happy-path and failure-path behavior for new logic.
+- Confirm HAR001/HAR002/HAR003/HAR004/HAR005 expectations remain enforced after the change.
 
 ### Important (should follow)
 - Flag maintainability risks (ambiguous naming, unclear ownership, hidden coupling).

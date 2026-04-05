@@ -164,6 +164,123 @@ if (typeof calibrationPath === "string" && fileExists(calibrationPath)) {
   }
 }
 
+const harCoverageConfig = contract.harRuleCoverage ?? {};
+const matrixPath = harCoverageConfig.matrixFile;
+if (typeof matrixPath === "string" && matrixPath.length > 0) {
+  if (!fileExists(matrixPath)) {
+    fail(`Standards drift: HAR coverage matrix '${matrixPath}' is missing`);
+  } else {
+    pass(`HAR coverage matrix exists: ${matrixPath}`);
+
+    const matrix = readJson(matrixPath);
+    const entries = Array.isArray(matrix.rules) ? matrix.rules : [];
+    const requiredEntryKeys = new Set(harCoverageConfig.requiredEntryKeys ?? []);
+
+    const visionContractPath = harCoverageConfig.visionContractFile;
+    let requiredRules = new Set();
+    if (typeof visionContractPath === "string" && fileExists(visionContractPath)) {
+      const visionContract = readJson(visionContractPath);
+      requiredRules = new Set(visionContract.requiredHarnessRules ?? []);
+      pass(`Loaded required harness rules from ${visionContractPath}`);
+    } else {
+      fail("Standards drift: unable to load required harness rules for HAR coverage matrix validation");
+    }
+
+    const entryByRule = new Map();
+    for (const [index, entry] of entries.entries()) {
+      if (!entry || typeof entry !== "object") {
+        fail(`Standards drift: HAR matrix entry at index ${index} is not an object`);
+        continue;
+      }
+
+      for (const key of requiredEntryKeys) {
+        if (!(key in entry)) {
+          fail(`Standards drift: HAR matrix entry at index ${index} is missing '${key}'`);
+        }
+      }
+
+      const ruleId = String(entry.ruleId ?? "");
+      if (!ruleId) {
+        fail(`Standards drift: HAR matrix entry at index ${index} has empty ruleId`);
+        continue;
+      }
+
+      if (entryByRule.has(ruleId)) {
+        fail(`Standards drift: HAR matrix contains duplicate rule entry '${ruleId}'`);
+      } else {
+        entryByRule.set(ruleId, entry);
+      }
+
+      if (requiredRules.size > 0 && !requiredRules.has(ruleId)) {
+        fail(`Standards drift: HAR matrix has rule '${ruleId}' not present in vision-contract requiredHarnessRules`);
+      }
+
+      const standardFiles = Array.isArray(entry.standardFiles) ? entry.standardFiles : [];
+      if (standardFiles.length === 0) {
+        fail(`Standards drift: HAR matrix rule '${ruleId}' must include at least one standardFiles entry`);
+      }
+
+      for (const standardFile of standardFiles) {
+        if (!fileExists(standardFile)) {
+          fail(`Standards drift: HAR matrix rule '${ruleId}' references missing file '${standardFile}'`);
+          continue;
+        }
+
+        const standardsText = readText(standardFile);
+        if (!standardsText.includes(ruleId)) {
+          fail(`Standards drift: HAR matrix rule '${ruleId}' not explicitly mentioned in '${standardFile}'`);
+        } else {
+          pass(`HAR matrix rule '${ruleId}' is mentioned in ${standardFile}`);
+        }
+      }
+    }
+
+    for (const requiredRule of requiredRules) {
+      if (!entryByRule.has(requiredRule)) {
+        fail(`Standards drift: HAR matrix missing required rule '${requiredRule}'`);
+      } else {
+        pass(`HAR matrix includes required rule ${requiredRule}`);
+      }
+    }
+
+    const linterSourcePath = harCoverageConfig.linterSourceFile;
+    if (typeof linterSourcePath === "string" && fileExists(linterSourcePath)) {
+      const linterSource = readText(linterSourcePath);
+      const linterRuleTargets = new Map();
+      const regex = /if \(ruleId === "(HAR\d+)"\) \{[\s\S]*?templateTarget: "([^"]+)"/g;
+
+      for (const match of linterSource.matchAll(regex)) {
+        linterRuleTargets.set(match[1], match[2]);
+      }
+
+      if (linterRuleTargets.size === 0) {
+        warn(`Unable to extract HAR templateTarget mappings from ${linterSourcePath}`);
+      } else {
+        pass(`Extracted HAR templateTarget mappings from ${linterSourcePath}`);
+      }
+
+      for (const [ruleId, entry] of entryByRule.entries()) {
+        const expectedTarget = String(entry.templateTarget ?? "");
+        const linterTarget = linterRuleTargets.get(ruleId);
+        if (!linterTarget) {
+          fail(`Standards drift: linter mapping for '${ruleId}' is missing in ${linterSourcePath}`);
+          continue;
+        }
+
+        if (expectedTarget !== linterTarget) {
+          fail(
+            `Standards drift: templateTarget mismatch for '${ruleId}' (matrix='${expectedTarget}', linter='${linterTarget}')`
+          );
+        } else {
+          pass(`HAR matrix target matches linter for ${ruleId} (${expectedTarget})`);
+        }
+      }
+    } else {
+      fail("Standards drift: linter source file for HAR coverage mapping is missing");
+    }
+  }
+}
+
 const docsIndexPath = "docs/README.md";
 if (fileExists(docsIndexPath)) {
   const docsIndex = readText(docsIndexPath);

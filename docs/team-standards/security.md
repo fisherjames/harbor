@@ -11,9 +11,9 @@ Act as a Harbor security-focused engineer reviewing implementation and runtime s
 ## Categorized Standards
 ### Critical (must follow)
 - Enforce tenant/workspace isolation on all data access and mutation paths.
-- Block unauthorized tool usage and ensure audit visibility.
+- Block unauthorized tool usage and ensure audit visibility (HAR002).
 - Reject unsafe secret handling (hardcoded credentials, unscoped tokens).
-- Ensure PII handling follows configured retention/redaction policy.
+- Ensure PII handling follows configured retention/redaction policy (HAR004).
 
 ### Important (should follow)
 - Use least-privilege defaults for connectors and integrations.

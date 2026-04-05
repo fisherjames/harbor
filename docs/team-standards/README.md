@@ -13,6 +13,7 @@ These files encode Harbor's tacit team standards into executable, versioned arti
 - `refactoring.md`: standards for changing existing code safely.
 - `security.md`: standards for threat-model-driven checks.
 - `review.md`: standards for structured pull request review.
+- `har-rule-coverage.json`: standards-to-HAR rule coverage matrix and template target mapping.
 
 ## Calibration
 - `calibration.md` tracks lightweight alignment cadence and change criteria.

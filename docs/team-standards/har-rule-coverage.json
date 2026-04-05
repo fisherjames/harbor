@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "ruleId": "HAR001",
+      "templateTarget": "verification",
+      "standardFiles": [
+        "docs/team-standards/generation.md",
+        "docs/team-standards/review.md"
+      ],
+      "summary": "Verifier stage with explicit PASS/FAIL acceptance checks is mandatory."
+    },
+    {
+      "ruleId": "HAR002",
+      "templateTarget": "tooling",
+      "standardFiles": [
+        "docs/team-standards/security.md",
+        "docs/team-standards/review.md"
+      ],
+      "summary": "Tool execution must be least-privilege and fail closed when unauthorized."
+    },
+    {
+      "ruleId": "HAR003",
+      "templateTarget": "budgeting",
+      "standardFiles": [
+        "docs/team-standards/generation.md",
+        "docs/team-standards/refactoring.md",
+        "docs/team-standards/review.md"
+      ],
+      "summary": "Every node must carry timeout and retry budgets with deterministic escalation."
+    },
+    {
+      "ruleId": "HAR004",
+      "templateTarget": "memory",
+      "standardFiles": [
+        "docs/team-standards/generation.md",
+        "docs/team-standards/security.md",
+        "docs/team-standards/review.md"
+      ],
+      "summary": "memU retrieval/writeback and PII retention policies must be explicit and valid."
+    },
+    {
+      "ruleId": "HAR005",
+      "templateTarget": "tooling",
+      "standardFiles": [
+        "docs/team-standards/generation.md",
+        "docs/team-standards/refactoring.md",
+        "docs/team-standards/review.md"
+      ],
+      "summary": "Tool-call nodes require timeout, retry, and max-call budgets."
+    }
+  ]
+}
