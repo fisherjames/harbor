@@ -7,8 +7,8 @@ import {
   type WorkflowDefinition
 } from "@harbor/harness";
 import type { MemuWriteInput } from "@harbor/memu";
-import type { WorkflowRunnerDependencies } from "../contracts/runtime.js";
-import type { RunContext, RunStage, WorkflowRunRequest, WorkflowRunResult } from "../contracts/types.js";
+import type { RunIsolationSession, WorkflowRunnerDependencies } from "../contracts/runtime.js";
+import type { RunContext, RunStage, RunStatus, WorkflowRunRequest, WorkflowRunResult } from "../contracts/types.js";
 import { withRetry } from "./retry.js";
 
 const STAGES: RunStage[] = ["plan", "execute", "verify"];
@@ -218,50 +218,109 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
         workflow,
         runId
       };
+      let isolationSession: RunIsolationSession | undefined;
+      let outcome: RunStatus = "running";
+      const teardownIsolation = async (): Promise<void> => {
+        if (!isolationSession) {
+          return;
+        }
 
-      const lintReport = runLintAtExecutionPoint("runtime-pre-stage", workflow).report;
-      await dependencies.persistence.addLintFindings(runId, lintReport.findings);
+        try {
+          await dependencies.runIsolation!.teardown(context, isolationSession, outcome);
+        } catch (error) {
+          const err = error as Error;
 
-      for (const finding of lintReport.findings) {
-        dependencies.tracer.finding({
-          runId,
-          workflowId: workflow.id,
-          message: finding.message,
-          metadata: {
-            ruleId: finding.ruleId,
-            severity: finding.severity
-          }
-        });
-      }
+          dependencies.tracer.error({
+            runId,
+            workflowId: workflow.id,
+            message: "Run isolation teardown failed",
+            error: err
+          });
 
-      const toolPolicies = toolPolicySnapshot(workflow);
-      if (toolPolicies.length > 0) {
-        await dependencies.persistence.storeArtifact(runId, "tool-execution-policy", JSON.stringify(toolPolicies));
-      }
+          await dependencies.persistence
+            .storeArtifact(runId, "run-isolation-teardown-error", err.message)
+            .catch(() => undefined);
+        }
+      };
 
-      if (lintReport.blocked) {
-        await dependencies.persistence.updateStatus(runId, "failed", {
-          reason: "critical_lint_findings"
-        });
+      if (dependencies.runIsolation) {
+        try {
+          isolationSession = await dependencies.runIsolation.setup(context);
+          await dependencies.persistence.storeArtifact(runId, "run-isolation-session", JSON.stringify(isolationSession));
+        } catch (error) {
+          const err = error as Error;
+          outcome = "failed";
 
-        return {
-          runId,
-          status: "failed",
-          finalOutput: {
-            reason: "critical_lint_findings",
-            lintFindings: lintReport.findings
-          }
-        };
-      }
+          dependencies.tracer.error({
+            runId,
+            workflowId: workflow.id,
+            message: "Run isolation setup failed",
+            error: err
+          });
 
-      const nonBlockingFindings = filterFindingsForPrompt(lintReport.findings);
-      const resolutionSteps = resolutionStepsFromFindings(nonBlockingFindings);
+          await dependencies.persistence.storeArtifact(runId, "run-isolation-setup-error", err.message);
+          await dependencies.persistence.updateStatus(runId, "failed", {
+            reason: "run_isolation_setup_failed",
+            detail: err.message
+          });
+          await teardownIsolation();
 
-      if (resolutionSteps.length > 0) {
-        await dependencies.persistence.storeArtifact(runId, "harness-resolution-steps", JSON.stringify(resolutionSteps));
+          return {
+            runId,
+            status: "failed",
+            finalOutput: {
+              reason: "run_isolation_setup_failed",
+              detail: err.message
+            }
+          };
+        }
       }
 
       try {
+        const lintReport = runLintAtExecutionPoint("runtime-pre-stage", workflow).report;
+        await dependencies.persistence.addLintFindings(runId, lintReport.findings);
+
+        for (const finding of lintReport.findings) {
+          dependencies.tracer.finding({
+            runId,
+            workflowId: workflow.id,
+            message: finding.message,
+            metadata: {
+              ruleId: finding.ruleId,
+              severity: finding.severity
+            }
+          });
+        }
+
+        const toolPolicies = toolPolicySnapshot(workflow);
+        if (toolPolicies.length > 0) {
+          await dependencies.persistence.storeArtifact(runId, "tool-execution-policy", JSON.stringify(toolPolicies));
+        }
+
+        if (lintReport.blocked) {
+          outcome = "failed";
+          await dependencies.persistence.updateStatus(runId, "failed", {
+            reason: "critical_lint_findings"
+          });
+          await teardownIsolation();
+
+          return {
+            runId,
+            status: "failed",
+            finalOutput: {
+              reason: "critical_lint_findings",
+              lintFindings: lintReport.findings
+            }
+          };
+        }
+
+        const nonBlockingFindings = filterFindingsForPrompt(lintReport.findings);
+        const resolutionSteps = resolutionStepsFromFindings(nonBlockingFindings);
+
+        if (resolutionSteps.length > 0) {
+          await dependencies.persistence.storeArtifact(runId, "harness-resolution-steps", JSON.stringify(resolutionSteps));
+        }
+
         await runSingleStage("plan", context, dependencies, nonBlockingFindings);
         const executeOutput = await runSingleStage("execute", context, dependencies, nonBlockingFindings);
         let verifyOutput = await runSingleStage("verify", context, dependencies, nonBlockingFindings);
@@ -284,9 +343,11 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
         }
 
         if (!verifyPassed(verifyOutput)) {
+          outcome = "needs_human";
           await dependencies.persistence.updateStatus(runId, "needs_human", {
             reason: "verification_failed"
           });
+          await teardownIsolation();
 
           return {
             runId,
@@ -312,6 +373,8 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
         );
 
         await dependencies.persistence.updateStatus(runId, "completed");
+        outcome = "completed";
+        await teardownIsolation();
 
         return {
           runId,
@@ -334,6 +397,8 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
         await dependencies.persistence.updateStatus(runId, "failed", {
           reason: err.message
         });
+        outcome = "failed";
+        await teardownIsolation();
 
         return {
           runId,

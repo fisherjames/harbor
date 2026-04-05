@@ -8,6 +8,7 @@ import {
   type RunStore
 } from "@harbor/database";
 import type { WorkflowDefinition } from "@harbor/harness";
+import { createWorktreeBoundRunIsolationManager } from "./run-isolation.js";
 
 export interface WorkflowRunRequestedEvent {
   name: "harbor/workflow.run.requested";
@@ -29,12 +30,14 @@ const persistence: RunStore = process.env.DATABASE_URL
   ? createPostgresRunPersistence(process.env.DATABASE_URL)
   : new InMemoryRunPersistence();
 const tracer = createRunTracer("harbor-worker");
+const runIsolation = createWorktreeBoundRunIsolationManager();
 
 const runner = createWorkflowRunner({
   model: new EchoModelProvider(),
   memu: memuClient,
   persistence,
   tracer,
+  runIsolation,
   maxFixAttempts: 1
 });
 

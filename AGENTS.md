@@ -1,6 +1,6 @@
 # AGENTS.md instructions for /Users/james/Documents/GitHub/harbor
 
-This repository is **not** a Brian workspace.
+This repository is standalone and not a Brian workspace.
 
 ## Mission
 Harbor is a standalone TypeScript agent orchestration platform with harness-first runtime guarantees.
