@@ -40,6 +40,7 @@ describe("assembleStagePrompt", () => {
     });
 
     expect(prompt).toContain("## Harness Resolution Steps");
+    expect(prompt).toContain("Apply these steps without changing the primary objective");
     expect(prompt).toContain("Add timeout budget");
     expect(prompt).toContain("## Constraints");
     expect(prompt).toContain("## Memory Context");
@@ -54,5 +55,30 @@ describe("assembleStagePrompt", () => {
 
     expect(prompt).not.toContain("## Harness Resolution Steps");
     expect(prompt).not.toContain("## Verifier Checkpoint");
+  });
+
+  it("deduplicates resolution steps and renders replace patches explicitly", () => {
+    const prompt = assembleStagePrompt({
+      stage: "verify",
+      workflow,
+      baseTask: "Verify output",
+      lintFindings: [
+        {
+          findingId: "HAR010:a",
+          ruleId: "HAR010",
+          severity: "warning",
+          message: "Constraint missing",
+          resolutionSteps: ["Use bounded scope", "Use bounded scope", "   "],
+          promptPatch: {
+            section: "constraints",
+            operation: "replace",
+            content: "Always enforce bounded scope."
+          }
+        }
+      ]
+    });
+
+    expect(prompt).toContain("Replace existing guidance with: Always enforce bounded scope.");
+    expect(prompt.split("Use bounded scope").length - 1).toBe(1);
   });
 });

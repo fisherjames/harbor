@@ -1,6 +1,7 @@
 import {
   assembleStagePrompt,
   filterFindingsForPrompt,
+  generateRemediationRecommendations,
   runLintAtExecutionPoint,
   summarizePostRunFindings,
   type WorkflowDefinition
@@ -248,17 +249,18 @@ export function createWorkflowRunner(dependencies: WorkflowRunnerDependencies) {
           };
         }
 
+        const postRunSummary = summarizePostRunFindings([
+          {
+            workflowVersion: workflow.version,
+            findings: lintReport.findings
+          }
+        ]);
+
+        await dependencies.persistence.storeArtifact(runId, "post-run-lint-summary", JSON.stringify(postRunSummary));
         await dependencies.persistence.storeArtifact(
           runId,
-          "post-run-lint-summary",
-          JSON.stringify(
-            summarizePostRunFindings([
-              {
-                workflowVersion: workflow.version,
-                findings: lintReport.findings
-              }
-            ])
-          )
+          "post-run-remediation-recommendations",
+          JSON.stringify(generateRemediationRecommendations(postRunSummary))
         );
 
         await dependencies.persistence.updateStatus(runId, "completed");

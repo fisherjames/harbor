@@ -51,6 +51,15 @@ export interface LintReport {
   blocked: boolean;
 }
 
+export interface RemediationRecommendation {
+  ruleId: string;
+  count: number;
+  latestVersion: number;
+  suggestion: string;
+  templateTarget: "verification" | "tooling" | "budgeting" | "memory" | "general";
+  promotionCandidate: boolean;
+}
+
 export interface AssemblePromptInput {
   stage: "plan" | "execute" | "verify" | "fix";
   workflow: WorkflowDefinition;

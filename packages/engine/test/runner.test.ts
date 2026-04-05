@@ -4,6 +4,7 @@ import type { WorkflowDefinition } from "@harbor/harness";
 
 class InMemoryPersistence implements RunPersistence {
   public readonly stages: { runId: string; prompt: string; stage: string }[] = [];
+  public readonly artifacts: Record<string, string> = {};
   public status: string = "queued";
 
   async createRun(): Promise<string> {
@@ -22,8 +23,8 @@ class InMemoryPersistence implements RunPersistence {
     this.stages.push({ runId, stage: record.stage, prompt: record.prompt });
   }
 
-  async storeArtifact(): Promise<void> {
-    return;
+  async storeArtifact(_runId: string, name: string, value: string): Promise<void> {
+    this.artifacts[name] = value;
   }
 }
 
@@ -138,6 +139,18 @@ describe("createWorkflowRunner", () => {
 
     expect(result.status).toBe("completed");
     expect(persistence.stages.some((stage) => stage.prompt.includes("## Harness Resolution Steps"))).toBe(true);
+    const summary = JSON.parse(persistence.artifacts["post-run-lint-summary"]) as Record<
+      string,
+      { count: number; latestVersion: number }
+    >;
+    expect(summary.HAR003.count).toBeGreaterThan(0);
+
+    const recommendations = JSON.parse(
+      persistence.artifacts["post-run-remediation-recommendations"]
+    ) as Array<{ ruleId: string; templateTarget: string; promotionCandidate: boolean }>;
+    expect(recommendations.some((item) => item.ruleId === "HAR003")).toBe(true);
+    expect(recommendations.some((item) => item.templateTarget === "budgeting")).toBe(true);
+    expect(recommendations.some((item) => item.promotionCandidate === true)).toBe(true);
   });
 
   it("uses fallback memory context and records token usage fields", async () => {

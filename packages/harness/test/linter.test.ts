@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterFindingsForPrompt,
+  generateRemediationRecommendations,
   lintWorkflowDefinition,
   runLintAtExecutionPoint,
   summarizePostRunFindings,
@@ -155,5 +156,59 @@ describe("lintWorkflowDefinition", () => {
 
     const filtered = filterFindingsForPrompt(report.findings);
     expect(filtered.some((f) => f.severity === "critical")).toBe(false);
+  });
+
+  it("generates deterministic remediation recommendations", () => {
+    const summary = summarizePostRunFindings([
+      {
+        workflowVersion: 2,
+        findings: [
+          {
+            findingId: "HAR003:a",
+            ruleId: "HAR003",
+            severity: "warning",
+            message: "Missing timeout",
+            resolutionSteps: ["Add timeout"]
+          }
+        ]
+      },
+      {
+        workflowVersion: 4,
+        findings: [
+          {
+            findingId: "HAR003:b",
+            ruleId: "HAR003",
+            severity: "warning",
+            message: "Missing retry",
+            resolutionSteps: ["Add retry"]
+          },
+          {
+            findingId: "HAR999:a",
+            ruleId: "HAR999",
+            severity: "info",
+            message: "Unknown style issue",
+            resolutionSteps: ["Apply style fix"]
+          }
+        ]
+      }
+    ]);
+
+    const recommendations = generateRemediationRecommendations(summary, 2);
+    expect(recommendations[0].ruleId).toBe("HAR003");
+    expect(recommendations[0].promotionCandidate).toBe(true);
+    expect(recommendations[1].ruleId).toBe("HAR999");
+    expect(recommendations[1].templateTarget).toBe("general");
+  });
+
+  it("maps all core rule recommendations to expected template targets", () => {
+    const recommendations = generateRemediationRecommendations({
+      HAR001: { count: 1, latestVersion: 1 },
+      HAR002: { count: 1, latestVersion: 1 },
+      HAR004: { count: 1, latestVersion: 1 }
+    });
+
+    expect(recommendations.find((item) => item.ruleId === "HAR001")?.templateTarget).toBe("verification");
+    expect(recommendations.find((item) => item.ruleId === "HAR002")?.templateTarget).toBe("tooling");
+    expect(recommendations.find((item) => item.ruleId === "HAR004")?.templateTarget).toBe("memory");
   });
 });

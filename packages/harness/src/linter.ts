@@ -1,5 +1,10 @@
 import { applyCoreHarnessRules } from "./rules/core-rules.js";
-import type { LintFinding, LintReport, WorkflowDefinition } from "./types.js";
+import type {
+  LintFinding,
+  LintReport,
+  RemediationRecommendation,
+  WorkflowDefinition
+} from "./types.js";
 
 export function lintWorkflowDefinition(workflow: WorkflowDefinition): LintReport {
   const findings = applyCoreHarnessRules(workflow);
@@ -51,4 +56,65 @@ export function summarizePostRunFindings(
   }
 
   return summary;
+}
+
+function recommendationForRule(ruleId: string): Pick<RemediationRecommendation, "suggestion" | "templateTarget"> {
+  if (ruleId === "HAR001") {
+    return {
+      suggestion: "Promote verifier-node template with explicit PASS/FAIL acceptance checks.",
+      templateTarget: "verification"
+    };
+  }
+
+  if (ruleId === "HAR002") {
+    return {
+      suggestion: "Promote least-privilege tool allow-list policy template.",
+      templateTarget: "tooling"
+    };
+  }
+
+  if (ruleId === "HAR003") {
+    return {
+      suggestion: "Promote default timeout/retry budget template for every workflow node.",
+      templateTarget: "budgeting"
+    };
+  }
+
+  if (ruleId === "HAR004") {
+    return {
+      suggestion: "Promote standard memU policy template with bounded retrieval and PII retention.",
+      templateTarget: "memory"
+    };
+  }
+
+  return {
+    suggestion: "Promote a reusable harness template for this recurring finding.",
+    templateTarget: "general"
+  };
+}
+
+export function generateRemediationRecommendations(
+  summary: Record<string, { count: number; latestVersion: number }>,
+  promotionThreshold = 3
+): RemediationRecommendation[] {
+  return Object.entries(summary)
+    .sort((a, b) => {
+      if (a[1].count === b[1].count) {
+        return a[0].localeCompare(b[0]);
+      }
+
+      return b[1].count - a[1].count;
+    })
+    .map(([ruleId, stats]) => {
+      const recommendation = recommendationForRule(ruleId);
+
+      return {
+        ruleId,
+        count: stats.count,
+        latestVersion: stats.latestVersion,
+        suggestion: recommendation.suggestion,
+        templateTarget: recommendation.templateTarget,
+        promotionCandidate: stats.count >= promotionThreshold
+      };
+    });
 }

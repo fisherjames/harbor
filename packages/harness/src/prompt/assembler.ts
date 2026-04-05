@@ -1,5 +1,21 @@
 import type { AssemblePromptInput, LintFinding, PromptPatch } from "../types.js";
 
+function uniquePreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    result.push(value);
+  }
+
+  return result;
+}
+
 function renderPatchBlock(section: PromptPatch["section"], patches: PromptPatch[]): string {
   if (patches.length === 0) {
     return "";
@@ -12,7 +28,11 @@ function renderPatchBlock(section: PromptPatch["section"], patches: PromptPatch[
     memory: "Memory"
   };
 
-  const content = patches.map((patch) => `- ${patch.content}`).join("\n");
+  const content = patches
+    .map((patch) =>
+      patch.operation === "replace" ? `- Replace existing guidance with: ${patch.content}` : `- ${patch.content}`
+    )
+    .join("\n");
   return `## ${titleBySection[section]}\n${content}`;
 }
 
@@ -23,10 +43,13 @@ function injectHarnessResolutionSteps(findings: LintFinding[]): string {
 
   const steps = findings
     .flatMap((finding) => finding.resolutionSteps)
+    .filter((step) => step.trim().length > 0);
+
+  const dedupedSteps = uniquePreserveOrder(steps)
     .map((step, index) => `${index + 1}. ${step}`)
     .join("\n");
 
-  return `## Harness Resolution Steps\n${steps}`;
+  return `## Harness Resolution Steps\nApply these steps without changing the primary objective:\n${dedupedSteps}`;
 }
 
 function buildVerifierCheckpoint(findings: LintFinding[]): string {
@@ -34,9 +57,11 @@ function buildVerifierCheckpoint(findings: LintFinding[]): string {
     return "";
   }
 
-  const constraints = findings.map((finding) => `- [ ] ${finding.ruleId}: ${finding.message}`).join("\n");
+  const constraints = uniquePreserveOrder(
+    findings.map((finding) => `- [ ] ${finding.ruleId}: ${finding.message}`)
+  ).join("\n");
 
-  return `## Verifier Checkpoint\nConfirm these constraints have been addressed:\n${constraints}`;
+  return `## Verifier Checkpoint\nConfirm each item before reporting PASS:\n${constraints}`;
 }
 
 export function assembleStagePrompt(input: AssemblePromptInput): string {

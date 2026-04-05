@@ -2,6 +2,7 @@ export type {
   LintSeverity,
   LintFinding,
   PromptPatch,
+  RemediationRecommendation,
   WorkflowNodeType,
   WorkflowNode,
   WorkflowDefinition,
@@ -13,6 +14,7 @@ export {
   filterFindingsForPrompt,
   runLintAtExecutionPoint,
   summarizePostRunFindings,
+  generateRemediationRecommendations,
   type LintExecutionPoint,
   type LintExecutionResult
 } from "./linter.js";
