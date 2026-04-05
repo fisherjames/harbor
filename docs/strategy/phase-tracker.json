@@ -1,0 +1,45 @@
+{
+  "currentPhase": "phase-2",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "MVP Core",
+      "status": "complete",
+      "evidence": [
+        "packages/engine/src/runtime/runner.ts",
+        "apps/web/app/page.tsx",
+        "apps/web/app/runs/[runId]/page.tsx",
+        "packages/database/src/repositories/run-store.ts"
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "MVP Complete",
+      "status": "in_progress",
+      "evidence": [
+        "apps/web/app/workflows/[workflowId]/builder/page.tsx",
+        "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
+        "packages/api/src/router.ts",
+        "packages/database/src/repositories/workflow-registry.ts"
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "Polished Production",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "id": "phase-4",
+      "name": "Enterprise Foundation",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "id": "phase-5",
+      "name": "Full Enterprise Product",
+      "status": "planned",
+      "evidence": []
+    }
+  ]
+}

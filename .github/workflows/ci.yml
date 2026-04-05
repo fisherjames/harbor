@@ -26,6 +26,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Vision Drift Check
+        run: pnpm vision:check
+
       - name: Lint
         run: pnpm lint
 

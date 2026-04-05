@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "project": "Harbor",
+  "requiredWorkspaces": [
+    "apps/web",
+    "apps/worker",
+    "packages/engine",
+    "packages/harness",
+    "packages/memu",
+    "packages/database",
+    "packages/api",
+    "packages/observability"
+  ],
+  "lockedDecisions": {
+    "durableRuntime": "inngest",
+    "authTenancy": "clerk_orgs",
+    "apiContracts": "trpc_everywhere",
+    "memoryPosture": "managed_memu_first",
+    "vcsIntegration": "github_only_mvp"
+  },
+  "requiredHarnessRules": [
+    "HAR001",
+    "HAR002",
+    "HAR003",
+    "HAR004"
+  ],
+  "requiredDecisionRecords": [
+    "docs/architecture/decision-records/0001-harness-first-runtime.md",
+    "docs/architecture/decision-records/0002-api-tenancy-boundaries.md",
+    "docs/architecture/decision-records/0003-workflow-version-lifecycle.md"
+  ],
+  "requiredPolicies": {
+    "projectScopedOnly": true,
+    "criticalLintBlocksDeploy": true,
+    "nonCriticalFindingsInjectResolutionSteps": true
+  }
+}
