@@ -14,6 +14,7 @@ import { createWorkflowRunner, EchoModelProvider } from "@harbor/engine";
 import { createInMemoryMemuClient, createMemuClient, type MemuClient } from "@harbor/memu";
 import { createRunTracer } from "@harbor/observability";
 import type { WorkflowDefinition } from "@harbor/harness";
+import { runGitHubPromotionGate } from "./github-promotion";
 
 function resolveMemuClient(): MemuClient {
   if (process.env.MEMU_ENDPOINT) {
@@ -145,6 +146,14 @@ export function getAppRouter(): AppRouter {
           actorId: context.actorId
         }
       );
+    },
+    async runPromotionChecks(_context, input) {
+      return runGitHubPromotionGate({
+        workflowId: input.workflowId,
+        version: input.version,
+        event: input.event,
+        evalStatus: input.evalGate.status
+      });
     }
   });
 
