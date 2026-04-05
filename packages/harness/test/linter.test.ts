@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   filterFindingsForPrompt,
   generateRemediationRecommendations,
+  HAR_RULE_IDS,
+  HAR_TEMPLATE_TARGET_BY_RULE,
   lintWorkflowDefinition,
   runLintAtExecutionPoint,
   summarizePostRunFindings,
@@ -248,13 +250,15 @@ describe("lintWorkflowDefinition", () => {
     const recommendations = generateRemediationRecommendations({
       HAR001: { count: 1, latestVersion: 1 },
       HAR002: { count: 1, latestVersion: 1 },
+      HAR003: { count: 1, latestVersion: 1 },
       HAR005: { count: 1, latestVersion: 1 },
       HAR004: { count: 1, latestVersion: 1 }
     });
 
-    expect(recommendations.find((item) => item.ruleId === "HAR001")?.templateTarget).toBe("verification");
-    expect(recommendations.find((item) => item.ruleId === "HAR002")?.templateTarget).toBe("tooling");
-    expect(recommendations.find((item) => item.ruleId === "HAR005")?.templateTarget).toBe("tooling");
-    expect(recommendations.find((item) => item.ruleId === "HAR004")?.templateTarget).toBe("memory");
+    for (const ruleId of HAR_RULE_IDS) {
+      expect(recommendations.find((item) => item.ruleId === ruleId)?.templateTarget).toBe(
+        HAR_TEMPLATE_TARGET_BY_RULE[ruleId]
+      );
+    }
   });
 });

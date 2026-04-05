@@ -69,7 +69,7 @@
   },
   "harRuleCoverage": {
     "visionContractFile": "docs/strategy/vision-contract.json",
-    "linterSourceFile": "packages/harness/src/linter.ts",
+    "catalogSourceFile": "packages/harness/src/rules/har-catalog.ts",
     "matrixFile": "docs/team-standards/har-rule-coverage.json",
     "requiredEntryKeys": [
       "ruleId",

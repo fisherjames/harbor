@@ -1,4 +1,9 @@
 import { applyCoreHarnessRules } from "./rules/core-rules.js";
+import {
+  HAR_REMEDIATION_SUGGESTION_BY_RULE,
+  HAR_TEMPLATE_TARGET_BY_RULE,
+  isHarRuleId
+} from "./rules/har-catalog.js";
 import type {
   LintFinding,
   LintReport,
@@ -59,38 +64,10 @@ export function summarizePostRunFindings(
 }
 
 function recommendationForRule(ruleId: string): Pick<RemediationRecommendation, "suggestion" | "templateTarget"> {
-  if (ruleId === "HAR001") {
+  if (isHarRuleId(ruleId)) {
     return {
-      suggestion: "Promote verifier-node template with explicit PASS/FAIL acceptance checks.",
-      templateTarget: "verification"
-    };
-  }
-
-  if (ruleId === "HAR002") {
-    return {
-      suggestion: "Promote least-privilege tool allow-list policy template.",
-      templateTarget: "tooling"
-    };
-  }
-
-  if (ruleId === "HAR005") {
-    return {
-      suggestion: "Promote per-tool timeout/retry/max-call budget templates for tool nodes.",
-      templateTarget: "tooling"
-    };
-  }
-
-  if (ruleId === "HAR003") {
-    return {
-      suggestion: "Promote default timeout/retry budget template for every workflow node.",
-      templateTarget: "budgeting"
-    };
-  }
-
-  if (ruleId === "HAR004") {
-    return {
-      suggestion: "Promote standard memU policy template with bounded retrieval and PII retention.",
-      templateTarget: "memory"
+      suggestion: HAR_REMEDIATION_SUGGESTION_BY_RULE[ruleId],
+      templateTarget: HAR_TEMPLATE_TARGET_BY_RULE[ruleId]
     };
   }
 

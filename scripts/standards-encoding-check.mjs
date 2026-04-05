@@ -243,40 +243,45 @@ if (typeof matrixPath === "string" && matrixPath.length > 0) {
       }
     }
 
-    const linterSourcePath = harCoverageConfig.linterSourceFile;
-    if (typeof linterSourcePath === "string" && fileExists(linterSourcePath)) {
-      const linterSource = readText(linterSourcePath);
-      const linterRuleTargets = new Map();
-      const regex = /if \(ruleId === "(HAR\d+)"\) \{[\s\S]*?templateTarget: "([^"]+)"/g;
+    const catalogSourcePath = harCoverageConfig.catalogSourceFile;
+    if (typeof catalogSourcePath === "string" && fileExists(catalogSourcePath)) {
+      const catalogSource = readText(catalogSourcePath);
+      const catalogRuleTargets = new Map();
+      const blockStartToken = "export const HAR_TEMPLATE_TARGET_BY_RULE";
+      const blockStart = catalogSource.indexOf(blockStartToken);
+      const blockEnd = blockStart === -1 ? -1 : catalogSource.indexOf("};", blockStart);
+      const targetBlock =
+        blockStart === -1 || blockEnd === -1 ? "" : catalogSource.slice(blockStart, blockEnd + 2);
+      const regex = /(HAR\d+):\s*"([^"]+)"/g;
 
-      for (const match of linterSource.matchAll(regex)) {
-        linterRuleTargets.set(match[1], match[2]);
+      for (const match of targetBlock.matchAll(regex)) {
+        catalogRuleTargets.set(match[1], match[2]);
       }
 
-      if (linterRuleTargets.size === 0) {
-        warn(`Unable to extract HAR templateTarget mappings from ${linterSourcePath}`);
+      if (catalogRuleTargets.size === 0) {
+        warn(`Unable to extract HAR templateTarget mappings from ${catalogSourcePath}`);
       } else {
-        pass(`Extracted HAR templateTarget mappings from ${linterSourcePath}`);
+        pass(`Extracted HAR templateTarget mappings from ${catalogSourcePath}`);
       }
 
       for (const [ruleId, entry] of entryByRule.entries()) {
         const expectedTarget = String(entry.templateTarget ?? "");
-        const linterTarget = linterRuleTargets.get(ruleId);
-        if (!linterTarget) {
-          fail(`Standards drift: linter mapping for '${ruleId}' is missing in ${linterSourcePath}`);
+        const catalogTarget = catalogRuleTargets.get(ruleId);
+        if (!catalogTarget) {
+          fail(`Standards drift: harness catalog mapping for '${ruleId}' is missing in ${catalogSourcePath}`);
           continue;
         }
 
-        if (expectedTarget !== linterTarget) {
+        if (expectedTarget !== catalogTarget) {
           fail(
-            `Standards drift: templateTarget mismatch for '${ruleId}' (matrix='${expectedTarget}', linter='${linterTarget}')`
+            `Standards drift: templateTarget mismatch for '${ruleId}' (matrix='${expectedTarget}', catalog='${catalogTarget}')`
           );
         } else {
-          pass(`HAR matrix target matches linter for ${ruleId} (${expectedTarget})`);
+          pass(`HAR matrix target matches harness catalog for ${ruleId} (${expectedTarget})`);
         }
       }
     } else {
-      fail("Standards drift: linter source file for HAR coverage mapping is missing");
+      fail("Standards drift: harness catalog source file for HAR coverage mapping is missing");
     }
   }
 }
