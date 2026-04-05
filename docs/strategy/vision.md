@@ -49,5 +49,6 @@ Harbor is a TypeScript-native agent orchestration platform that turns raw LLM ca
 - Every run binds to a dedicated worktree and can build/run the full stack without sharing mutable runtime state.
 - Every run emits to a run-scoped ephemeral observability channel with deterministic cleanup.
 - Repository entry docs and workspace README maps must stay synchronized and pass legibility drift checks.
+- Repository legibility map JSON must stay synchronized with workspace entrypoints and pass drift checks.
 - Team standards instruction files and calibration history must stay synchronized and pass standards drift checks.
 - New behavior includes success-path and failure-path tests.

@@ -9,6 +9,7 @@ Harbor is a standalone TypeScript agent orchestration platform with harness-firs
 - [`README.md`](README.md): repository overview and local commands.
 - [`docs/README.md`](docs/README.md): documentation index and canonical paths.
 - [`docs/strategy/vision.md`](docs/strategy/vision.md): locked decisions and non-negotiable invariants.
+- [`docs/strategy/repository-legibility-map.json`](docs/strategy/repository-legibility-map.json): machine-readable map of entrypoints and workspaces.
 - [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md): package boundaries and dependency flow.
 - [`docs/getting-started.md`](docs/getting-started.md): milestone cadence and validation checklist.
 - [`docs/team-standards/README.md`](docs/team-standards/README.md): encoded team standards and calibration loop.

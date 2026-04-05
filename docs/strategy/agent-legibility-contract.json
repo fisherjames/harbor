@@ -6,6 +6,7 @@
     "docs/README.md",
     "docs/architecture/ARCHITECTURE.md",
     "docs/getting-started.md",
+    "docs/strategy/repository-legibility-map.json",
     "docs/team-standards/README.md",
     "docs/strategy/team-standards-contract.json",
     "docs/exec-plans/index.md",
@@ -20,6 +21,7 @@
     "requiredPointers": [
       "docs/README.md",
       "docs/strategy/vision.md",
+      "docs/strategy/repository-legibility-map.json",
       "docs/architecture/ARCHITECTURE.md",
       "docs/getting-started.md"
     ]
@@ -49,6 +51,24 @@
     "requiredSections": [
       "## Purpose",
       "## Entrypoints"
+    ]
+  },
+  "repositoryMap": {
+    "path": "docs/strategy/repository-legibility-map.json",
+    "requiredTopLevelKeys": [
+      "version",
+      "entrypoints",
+      "workspaces"
+    ],
+    "requiredWorkspacePaths": [
+      "apps/web",
+      "apps/worker",
+      "packages/api",
+      "packages/database",
+      "packages/engine",
+      "packages/harness",
+      "packages/memu",
+      "packages/observability"
     ]
   },
   "naming": {

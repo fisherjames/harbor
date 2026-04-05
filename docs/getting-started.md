@@ -2,13 +2,13 @@
 
 <!-- DOCS_CADENCE_METADATA_BEGIN -->
 {
-  "currentPhase": "phase-2.6",
+  "currentPhase": "phase-2.5",
   "harnessRules": ["HAR001", "HAR002", "HAR003", "HAR004", "HAR005"],
   "milestones": [
     { "id": "phase-1", "status": "complete", "docsVerified": true },
     { "id": "phase-2", "status": "complete", "docsVerified": true },
-    { "id": "phase-2.5", "status": "complete", "docsVerified": true },
-    { "id": "phase-2.6", "status": "in_progress", "docsVerified": true },
+    { "id": "phase-2.5", "status": "in_progress", "docsVerified": true },
+    { "id": "phase-2.6", "status": "planned", "docsVerified": false },
     { "id": "phase-3", "status": "planned", "docsVerified": false },
     { "id": "phase-4", "status": "planned", "docsVerified": false },
     { "id": "phase-5", "status": "planned", "docsVerified": false }
@@ -51,8 +51,8 @@
 
 - `phase-1` (MVP Core): runtime, run dashboard, persistence foundations.
 - `phase-2` (MVP Complete): visual builder, version lifecycle, deploy gates, and GitHub-backed promotion workflows.
-- `phase-2.5` (Harness + Legibility Hardening): docs/index hardening, workspace legibility, and agent legibility drift gates.
-- `phase-2.6` (Team Standards Encoding): Fowler-style standards files, calibration cadence, and CI-enforced standards drift checks.
+- `phase-2.5` (Harness + Legibility Hardening): docs/index hardening, workspace legibility, repository map drift checks, and agent legibility gates.
+- `phase-2.6` (Team Standards Encoding): Fowler-style standards files, HAR coverage matrix, calibration cadence, and CI-enforced standards drift checks.
 - `phase-3` (Polished Production): idempotency hardening, replay tooling, operational dashboards.
 - `phase-4` (Enterprise Foundation): SAML/SCIM, immutable audit exports, policy governance.
 - `phase-5` (Full Enterprise Product): self-host packaging, HA topology, contract-grade SLO reporting.

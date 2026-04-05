@@ -133,6 +133,104 @@ if (!fileExists(docsIndexPath)) {
   }
 }
 
+const repositoryMapConfig = contract.repositoryMap ?? {};
+const repositoryMapPath = repositoryMapConfig.path;
+if (typeof repositoryMapPath === "string") {
+  if (!fileExists(repositoryMapPath)) {
+    fail(`Legibility drift: repository map '${repositoryMapPath}' is missing`);
+  } else {
+    pass(`Repository map exists: ${repositoryMapPath}`);
+
+    let repositoryMap;
+    try {
+      repositoryMap = readJson(repositoryMapPath);
+    } catch {
+      fail(`Legibility drift: repository map '${repositoryMapPath}' is not valid JSON`);
+    }
+
+    if (repositoryMap) {
+      for (const key of repositoryMapConfig.requiredTopLevelKeys ?? []) {
+        if (!(key in repositoryMap)) {
+          fail(`Legibility drift: repository map missing top-level key '${key}'`);
+        } else {
+          pass(`Repository map includes key: ${key}`);
+        }
+      }
+
+      const mappedEntrypoints = new Set(
+        Array.isArray(repositoryMap.entrypoints) ? repositoryMap.entrypoints.map((value) => String(value)) : []
+      );
+      for (const requiredEntrypoint of contract.requiredEntrypoints ?? []) {
+        if (!mappedEntrypoints.has(requiredEntrypoint)) {
+          fail(`Legibility drift: repository map is missing required entrypoint '${requiredEntrypoint}'`);
+        }
+      }
+
+      for (const mappedEntrypoint of mappedEntrypoints) {
+        if (!fileExists(mappedEntrypoint)) {
+          fail(`Legibility drift: repository map references missing entrypoint '${mappedEntrypoint}'`);
+        }
+      }
+      pass("Repository map entrypoints validated");
+
+      const workspaceEntries = Array.isArray(repositoryMap.workspaces) ? repositoryMap.workspaces : [];
+      const mapByWorkspacePath = new Map();
+      for (const entry of workspaceEntries) {
+        if (!entry || typeof entry !== "object") {
+          fail("Legibility drift: repository map workspace entry must be an object");
+          continue;
+        }
+
+        const workspacePath = String(entry.path ?? "");
+        const readmePath = String(entry.readme ?? "");
+        if (!workspacePath || !readmePath) {
+          fail("Legibility drift: repository map workspace entry requires path and readme");
+          continue;
+        }
+
+        mapByWorkspacePath.set(workspacePath, entry);
+
+        if (!fileExists(workspacePath)) {
+          fail(`Legibility drift: repository map workspace path missing '${workspacePath}'`);
+        }
+
+        if (!fileExists(readmePath)) {
+          fail(`Legibility drift: repository map workspace README missing '${readmePath}'`);
+        }
+
+        const workspaceEntrypoints = Array.isArray(entry.entrypoints) ? entry.entrypoints : [];
+        if (workspaceEntrypoints.length === 0) {
+          fail(`Legibility drift: workspace '${workspacePath}' must declare at least one entrypoint`);
+          continue;
+        }
+
+        for (const entrypoint of workspaceEntrypoints) {
+          const entrypointPath = String(entrypoint);
+          if (!fileExists(entrypointPath)) {
+            fail(`Legibility drift: workspace '${workspacePath}' references missing entrypoint '${entrypointPath}'`);
+          }
+        }
+      }
+
+      for (const requiredWorkspacePath of repositoryMapConfig.requiredWorkspacePaths ?? []) {
+        if (!mapByWorkspacePath.has(requiredWorkspacePath)) {
+          fail(`Legibility drift: repository map missing required workspace '${requiredWorkspacePath}'`);
+        } else {
+          pass(`Repository map includes workspace: ${requiredWorkspacePath}`);
+        }
+      }
+
+      for (const readmePath of contract.workspaceReadmes?.required ?? []) {
+        const mapped = workspaceEntries.some((entry) => entry && typeof entry === "object" && entry.readme === readmePath);
+        if (!mapped) {
+          fail(`Legibility drift: repository map does not reference required workspace README '${readmePath}'`);
+        }
+      }
+      pass("Repository map workspace coverage validated");
+    }
+  }
+}
+
 const rootReadmePath = "README.md";
 if (!fileExists(rootReadmePath)) {
   fail("Legibility drift: README.md is missing");

@@ -36,7 +36,8 @@
     "docs/architecture/decision-records/0005-run-worktree-isolation.md",
     "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
     "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
-    "docs/architecture/decision-records/0008-team-standards-encoding-gate.md"
+    "docs/architecture/decision-records/0008-team-standards-encoding-gate.md",
+    "docs/architecture/decision-records/0009-repository-legibility-map.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,

@@ -13,6 +13,7 @@ This index is the canonical entrypoint for both humans and coding agents.
 - [`/Users/james/Documents/GitHub/harbor/docs/strategy/phase-tracker.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/phase-tracker.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/strategy/documentation-contract.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/documentation-contract.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/strategy/agent-legibility-contract.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/agent-legibility-contract.json)
+- [`/Users/james/Documents/GitHub/harbor/docs/strategy/repository-legibility-map.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/repository-legibility-map.json)
 
 ## Architecture
 - [`/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md`](/Users/james/Documents/GitHub/harbor/docs/architecture/ARCHITECTURE.md)
@@ -20,6 +21,7 @@ This index is the canonical entrypoint for both humans and coding agents.
 
 ## Team Standards
 - [`/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md`](/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md)
+- [`/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-coverage.json`](/Users/james/Documents/GitHub/harbor/docs/team-standards/har-rule-coverage.json)
 - [`/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json`](/Users/james/Documents/GitHub/harbor/docs/strategy/team-standards-contract.json)
 
 ## Execution Plans

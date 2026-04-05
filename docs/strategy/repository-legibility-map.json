@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "entrypoints": [
+    "AGENTS.md",
+    "README.md",
+    "docs/README.md",
+    "docs/architecture/ARCHITECTURE.md",
+    "docs/getting-started.md",
+    "docs/strategy/vision.md",
+    "docs/strategy/repository-legibility-map.json",
+    "docs/team-standards/README.md",
+    "docs/strategy/team-standards-contract.json",
+    "docs/exec-plans/index.md",
+    "docs/exec-plans/tech-debt-tracker.md"
+  ],
+  "workspaces": [
+    {
+      "path": "apps/web",
+      "readme": "apps/web/README.md",
+      "entrypoints": [
+        "apps/web/app/page.tsx",
+        "apps/web/app/workflows/[workflowId]/builder/page.tsx"
+      ]
+    },
+    {
+      "path": "apps/worker",
+      "readme": "apps/worker/README.md",
+      "entrypoints": [
+        "apps/worker/src/index.ts",
+        "apps/worker/src/inngest.ts",
+        "apps/worker/src/run-isolation.ts"
+      ]
+    },
+    {
+      "path": "packages/api",
+      "readme": "packages/api/README.md",
+      "entrypoints": [
+        "packages/api/src/index.ts",
+        "packages/api/src/router.ts",
+        "packages/api/src/types.ts"
+      ]
+    },
+    {
+      "path": "packages/database",
+      "readme": "packages/database/README.md",
+      "entrypoints": [
+        "packages/database/src/index.ts",
+        "packages/database/src/repositories/workflow-registry.ts",
+        "packages/database/src/repositories/run-store.ts"
+      ]
+    },
+    {
+      "path": "packages/engine",
+      "readme": "packages/engine/README.md",
+      "entrypoints": [
+        "packages/engine/src/index.ts",
+        "packages/engine/src/runtime/runner.ts"
+      ]
+    },
+    {
+      "path": "packages/harness",
+      "readme": "packages/harness/README.md",
+      "entrypoints": [
+        "packages/harness/src/index.ts",
+        "packages/harness/src/linter.ts",
+        "packages/harness/src/prompt/assembler.ts"
+      ]
+    },
+    {
+      "path": "packages/memu",
+      "readme": "packages/memu/README.md",
+      "entrypoints": [
+        "packages/memu/src/index.ts",
+        "packages/memu/src/http/client.ts",
+        "packages/memu/src/policy/validation.ts"
+      ]
+    },
+    {
+      "path": "packages/observability",
+      "readme": "packages/observability/README.md",
+      "entrypoints": [
+        "packages/observability/src/index.ts"
+      ]
+    }
+  ]
+}
