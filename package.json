@@ -11,18 +11,25 @@
     "test": "turbo run test",
     "vision:check": "node ./scripts/vision-drift-check.mjs",
     "docs:check": "node ./scripts/docs-drift-check.mjs",
+    "features:check": "node ./scripts/features-drift-check.mjs",
     "legibility:check": "node ./scripts/agent-legibility-check.mjs",
     "standards:check": "node ./scripts/standards-encoding-check.mjs",
+    "evaluator:check": "node ./scripts/evaluator-calibration-check.mjs",
+    "adversarial:check": "node ./scripts/adversarial-taxonomy-check.mjs",
+    "inference:check": "node ./scripts/inference-check.mjs",
+    "replay:verify": "node ./scripts/replay-verify.mjs",
+    "policy:bundle": "node ./scripts/policy-bundle.mjs",
     "clean": "turbo run clean",
-    "check": "pnpm vision:check && pnpm docs:check && pnpm legibility:check && pnpm standards:check && pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm vision:check && pnpm docs:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.1.6",
+    "@vitest/coverage-v8": "^2.1.8",
+    "playwright": "1.52.0",
     "turbo": "^2.5.0",
     "typescript": "^5.9.0",
-    "vitest": "^2.1.8",
-    "@vitest/coverage-v8": "^2.1.8",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.1.6"
+    "vitest": "^2.1.8"
   }
 }

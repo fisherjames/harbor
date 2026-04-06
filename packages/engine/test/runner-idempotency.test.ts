@@ -259,6 +259,8 @@ describe("runner idempotency and transition keys", () => {
           prompt: "verify replay",
           output: "PASS",
           attempts: 1,
+          confidence: 0.91,
+          confidenceRationale: "Replay payload includes stage-level confidence evidence.",
           lintFindings: []
         }
       ]

@@ -1,0 +1,27 @@
+FROM node:22-alpine AS base
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+RUN corepack disable
+RUN npm install --global pnpm@8.6.2
+WORKDIR /app
+
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json tsconfig.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/worker/package.json apps/worker/package.json
+COPY packages/api/package.json packages/api/package.json
+COPY packages/database/package.json packages/database/package.json
+COPY packages/engine/package.json packages/engine/package.json
+COPY packages/harness/package.json packages/harness/package.json
+COPY packages/memu/package.json packages/memu/package.json
+COPY packages/observability/package.json packages/observability/package.json
+
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS runtime
+
+COPY . .
+RUN find . -name "*.tsbuildinfo" -delete

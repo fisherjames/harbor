@@ -15,7 +15,8 @@ const baseWorkflow: WorkflowDefinition = {
   name: "Example",
   version: 1,
   objective: "Produce a verified answer",
-  systemPrompt: "You are Harbor",
+  systemPrompt:
+    "You must follow explicit constraints, never exceed allowed tool scope, and return PASS or FAIL verification. For plan, verify, and fix stages include confidence (0-1) and optional rationale.",
   memoryPolicy: {
     retrievalMode: "monitor",
     maxContextItems: 8,
@@ -53,6 +54,36 @@ describe("lintWorkflowDefinition", () => {
 
     expect(report.blocked).toBe(false);
     expect(report.findings).toHaveLength(0);
+  });
+
+  it("blocks when workflow system prompt is blank after trimming", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      systemPrompt: "   "
+    });
+
+    expect(report.blocked).toBe(true);
+    expect(report.findings.some((f) => f.ruleId === "HAR006" && f.severity === "critical")).toBe(true);
+  });
+
+  it("adds warning when system prompt lacks explicit constraint language", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      systemPrompt: "Follow the workflow objective and answer clearly with PASS/FAIL."
+    });
+
+    expect(report.blocked).toBe(false);
+    expect(report.findings.some((f) => f.ruleId === "HAR007" && f.severity === "warning")).toBe(true);
+  });
+
+  it("adds warning when system prompt lacks verification language", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      systemPrompt: "You must follow constraints and only use approved tools."
+    });
+
+    expect(report.blocked).toBe(false);
+    expect(report.findings.some((f) => f.ruleId === "HAR008" && f.severity === "warning")).toBe(true);
   });
 
   it("blocks when verifier node is missing", () => {
@@ -127,6 +158,102 @@ describe("lintWorkflowDefinition", () => {
     });
 
     expect(report.findings.some((f) => f.ruleId === "HAR005")).toBe(false);
+  });
+
+  it("blocks when commit side-effect tool has no matching propose phase", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      nodes: [
+        ...baseWorkflow.nodes,
+        {
+          id: "tool-commit",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["payments:write"],
+          toolCallPolicy: {
+            timeoutMs: 800,
+            retryLimit: 2,
+            maxCalls: 1,
+            sideEffectMode: "commit",
+            phaseGroup: "payments"
+          }
+        }
+      ]
+    });
+
+    expect(report.blocked).toBe(true);
+    expect(report.findings.some((f) => f.ruleId === "HAR010" && f.severity === "critical")).toBe(true);
+  });
+
+  it("blocks when mutating tool mode is missing phaseGroup", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      nodes: [
+        ...baseWorkflow.nodes,
+        {
+          id: "tool-propose",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["payments:write"],
+          toolCallPolicy: {
+            timeoutMs: 800,
+            retryLimit: 2,
+            maxCalls: 1,
+            sideEffectMode: "propose"
+          }
+        }
+      ]
+    });
+
+    expect(report.blocked).toBe(true);
+    expect(
+      report.findings.some((finding) => finding.ruleId === "HAR010" && finding.message.includes("without phaseGroup"))
+    ).toBe(true);
+  });
+
+  it("accepts matching propose/commit side-effect tool phases", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      nodes: [
+        ...baseWorkflow.nodes,
+        {
+          id: "tool-propose",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["payments:write"],
+          toolCallPolicy: {
+            timeoutMs: 800,
+            retryLimit: 2,
+            maxCalls: 1,
+            sideEffectMode: "propose",
+            phaseGroup: "payments"
+          }
+        },
+        {
+          id: "tool-commit",
+          type: "tool_call",
+          timeoutMs: 1_000,
+          retryLimit: 1,
+          owner: "system",
+          toolPermissionScope: ["payments:write"],
+          toolCallPolicy: {
+            timeoutMs: 800,
+            retryLimit: 2,
+            maxCalls: 1,
+            sideEffectMode: "commit",
+            phaseGroup: "payments"
+          }
+        }
+      ]
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "HAR010")).toBe(false);
   });
 
   it("adds warning when node budgets are missing", () => {
@@ -260,5 +387,33 @@ describe("lintWorkflowDefinition", () => {
         HAR_TEMPLATE_TARGET_BY_RULE[ruleId]
       );
     }
+  });
+
+  it("maps extended system-prompt rules to targeted remediation recommendations", () => {
+    const recommendations = generateRemediationRecommendations({
+      HAR007: { count: 2, latestVersion: 5 },
+      HAR008: { count: 1, latestVersion: 5 },
+      HAR009: { count: 1, latestVersion: 5 },
+      HAR010: { count: 1, latestVersion: 5 }
+    });
+
+    expect(recommendations.find((item) => item.ruleId === "HAR007")?.templateTarget).toBe("verification");
+    expect(recommendations.find((item) => item.ruleId === "HAR007")?.suggestion).toContain("MUST/NEVER");
+    expect(recommendations.find((item) => item.ruleId === "HAR008")?.templateTarget).toBe("verification");
+    expect(recommendations.find((item) => item.ruleId === "HAR008")?.suggestion).toContain("PASS/FAIL");
+    expect(recommendations.find((item) => item.ruleId === "HAR009")?.templateTarget).toBe("verification");
+    expect(recommendations.find((item) => item.ruleId === "HAR009")?.suggestion).toContain("confidence");
+    expect(recommendations.find((item) => item.ruleId === "HAR010")?.templateTarget).toBe("tooling");
+    expect(recommendations.find((item) => item.ruleId === "HAR010")?.suggestion).toContain("two-phase");
+  });
+
+  it("adds warning when system prompt lacks confidence output contract", () => {
+    const report = lintWorkflowDefinition({
+      ...baseWorkflow,
+      systemPrompt: "You must follow constraints and return PASS or FAIL verification."
+    });
+
+    expect(report.blocked).toBe(false);
+    expect(report.findings.some((f) => f.ruleId === "HAR009" && f.severity === "warning")).toBe(true);
   });
 });

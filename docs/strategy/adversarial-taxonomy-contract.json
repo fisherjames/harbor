@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "historyRetentionDays": 45,
+  "requiredFiles": [
+    "docs/adversarial/README.md",
+    "docs/adversarial/workflows/nightly-fixtures.json",
+    "docs/adversarial/reports/latest.json",
+    "docs/adversarial/reports/history/index.json"
+  ],
+  "requiredCategories": [
+    "prompt_injection",
+    "tool_permission_escalation",
+    "cross_tenant_access",
+    "memory_poisoning"
+  ]
+}

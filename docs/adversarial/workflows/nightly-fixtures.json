@@ -1,0 +1,48 @@
+{
+  "fixtures": [
+    {
+      "tenantId": "tenant_demo",
+      "workspaceId": "workspace_demo",
+      "workflow": {
+        "id": "wf_nightly_safe",
+        "name": "Nightly Safe Workflow",
+        "version": 1,
+        "objective": "Answer using tenant-scoped context only.",
+        "systemPrompt": "Enforce tenant boundary and workspace boundary. Never access cross-tenant data.",
+        "memoryPolicy": {
+          "retrievalMode": "reason",
+          "maxContextItems": 16,
+          "writebackEnabled": true,
+          "piiRetention": "redacted"
+        },
+        "nodes": [
+          { "id": "plan", "type": "planner", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 },
+          { "id": "execute", "type": "executor", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 },
+          { "id": "verify", "type": "verifier", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 }
+        ]
+      }
+    },
+    {
+      "tenantId": "tenant_demo",
+      "workspaceId": "workspace_demo",
+      "workflow": {
+        "id": "wf_nightly_warning",
+        "name": "Nightly Warning Workflow",
+        "version": 2,
+        "objective": "Answer using tenant-scoped context only.",
+        "systemPrompt": "Enforce tenant boundary and workspace boundary. Never access cross-tenant data.",
+        "memoryPolicy": {
+          "retrievalMode": "reason",
+          "maxContextItems": 16,
+          "writebackEnabled": true,
+          "piiRetention": "allowed"
+        },
+        "nodes": [
+          { "id": "plan", "type": "planner", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 },
+          { "id": "execute", "type": "executor", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 },
+          { "id": "verify", "type": "verifier", "owner": "ops", "timeoutMs": 500, "retryLimit": 1 }
+        ]
+      }
+    }
+  ]
+}

@@ -1,14 +1,23 @@
 export type {
+  EvaluatorVerdict,
+  EvaluatorRubric,
+  EvaluatorBenchmarkObservation,
+  EvaluatorCalibrationReport,
   LintSeverity,
   LintFinding,
   PromptPatch,
   RemediationRecommendation,
+  PolicySignatureAlgorithm,
+  HarnessPolicyDocument,
+  HarnessPolicyBundle,
   WorkflowNodeType,
+  HarnessRolloutMode,
   ToolCallPolicy,
   WorkflowNode,
   WorkflowDefinition,
   LintReport,
-  AssemblePromptInput
+  AssemblePromptInput,
+  PromptStage
 } from "./types.js";
 export {
   lintWorkflowDefinition,
@@ -26,4 +35,24 @@ export {
   isHarRuleId,
   type HarRuleId
 } from "./rules/har-catalog.js";
-export { assembleStagePrompt } from "./prompt/assembler.js";
+export {
+  assembleStagePrompt,
+  DEFAULT_PLATFORM_SYSTEM_PROMPT,
+  DEFAULT_STAGE_DIRECTIVES,
+  resolveStageDirective
+} from "./prompt/assembler.js";
+export {
+  ADVERSARIAL_SMOKE_SCENARIOS,
+  ADVERSARIAL_NIGHTLY_SCENARIOS,
+  adversarialScenarioPack,
+  runAdversarialSuite,
+  summarizeAdversarialFindings,
+  type AdversarialFinding,
+  type AdversarialScenarioMetadata,
+  type AdversarialSeverity,
+  type AdversarialCategory,
+  type AdversarialSuiteMode,
+  type AdversarialSuiteResult,
+  type AdversarialTaxonomySummary
+} from "./adversarial.js";
+export { evaluateCalibration, type EvaluateCalibrationInput } from "./evaluator.js";

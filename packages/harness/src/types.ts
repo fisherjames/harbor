@@ -5,6 +5,34 @@ export interface MemoryPolicy {
   piiRetention: "forbidden" | "redacted" | "allowed";
 }
 
+export type EvaluatorVerdict = "pass" | "fail";
+
+export interface EvaluatorRubric {
+  rubricVersion: string;
+  benchmarkSetId: string;
+  calibratedAt: string;
+  minimumAgreement: number;
+  maximumDrift: number;
+}
+
+export interface EvaluatorBenchmarkObservation {
+  scenarioId: string;
+  expectedVerdict: EvaluatorVerdict;
+  observedVerdict: EvaluatorVerdict;
+}
+
+export interface EvaluatorCalibrationReport {
+  rubricVersion: string;
+  benchmarkSetId: string;
+  calibratedAt: string;
+  agreementScore: number;
+  driftScore: number;
+  minimumAgreement: number;
+  maximumDrift: number;
+  driftDetected: boolean;
+  failingScenarioIds: string[];
+}
+
 export type LintSeverity = "info" | "warning" | "critical";
 
 export interface PromptPatch {
@@ -23,12 +51,43 @@ export interface LintFinding {
   resolutionSteps: string[];
 }
 
+export type PromptStage = "plan" | "execute" | "verify" | "fix";
+export type PolicySignatureAlgorithm = "sha256";
+
+export interface HarnessPolicyDocument {
+  version: string;
+  issuedAt: string;
+  constraints: {
+    requireNodeOwner: boolean;
+    requireNodeBudget: boolean;
+    requireToolPolicy: boolean;
+    requireMemoryPolicy: boolean;
+    allowPromptMutationsOnlyInHarness: boolean;
+  };
+  runtime: {
+    blockOnCriticalLint: boolean;
+    maxFixAttempts: number;
+    requireReplayBundle: boolean;
+  };
+}
+
+export interface HarnessPolicyBundle {
+  policyVersion: string;
+  algorithm: PolicySignatureAlgorithm;
+  checksum: string;
+  signature: string;
+  document: HarnessPolicyDocument;
+}
+
 export type WorkflowNodeType = "planner" | "executor" | "verifier" | "memory_write" | "tool_call";
+export type HarnessRolloutMode = "active" | "canary" | "shadow";
 
 export interface ToolCallPolicy {
   timeoutMs: number;
   retryLimit: number;
   maxCalls: number;
+  sideEffectMode?: "read" | "propose" | "commit" | undefined;
+  phaseGroup?: string | undefined;
 }
 
 export interface WorkflowNode {
@@ -49,8 +108,10 @@ export interface WorkflowDefinition {
   version: number;
   objective: string;
   systemPrompt: string;
+  rolloutMode?: HarnessRolloutMode | undefined;
   nodes: WorkflowNode[];
   memoryPolicy?: MemoryPolicy | undefined;
+  policyBundle?: HarnessPolicyBundle | undefined;
 }
 
 export interface LintReport {
@@ -68,9 +129,12 @@ export interface RemediationRecommendation {
 }
 
 export interface AssemblePromptInput {
-  stage: "plan" | "execute" | "verify" | "fix";
+  stage: PromptStage;
   workflow: WorkflowDefinition;
   baseTask: string;
+  platformSystemPrompt?: string | undefined;
+  workflowSystemPrompt?: string | undefined;
+  stageDirective?: string | undefined;
   memoryContext?: string | undefined;
   lintFindings?: LintFinding[] | undefined;
   resolutionSectionAppendix?: string | undefined;

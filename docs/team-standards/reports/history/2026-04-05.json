@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedBy": "scripts/standards-encoding-check.mjs",
-  "currentPhase": "phase-2.6",
+  "currentPhase": "phase-2.8",
   "status": "pass",
   "counts": {
     "passes": 112,

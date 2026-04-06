@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedBy": "scripts/standards-encoding-check.mjs",
-  "currentPhase": "phase-2.6",
+  "currentPhase": "phase-3",
   "status": "pass",
   "counts": {
     "passes": 112,
@@ -9,7 +9,7 @@
     "failures": 0
   },
   "trendSummary": {
-    "windowEntries": 1,
+    "windowEntries": 2,
     "warningSignals": [],
     "failureSignals": []
   },
@@ -85,7 +85,7 @@
     "Calibration file includes heading '## Calibration Steps'",
     "Calibration file includes heading '## History'",
     "Calibration history includes 2 dated entries",
-    "Calibration freshness within threshold (0 days old)",
+    "Calibration freshness within threshold (1 days old)",
     "HAR coverage matrix exists: docs/team-standards/har-rule-coverage.json",
     "Loaded required harness rules from docs/strategy/vision-contract.json",
     "HAR matrix rule 'HAR001' is mentioned in docs/team-standards/generation.md",
@@ -125,9 +125,9 @@
     "HAR examples pack includes required rule HAR005",
     "Docs index includes Team Standards section",
     "AGENTS.md points to team standards index",
-    "Wrote standards history snapshot: docs/team-standards/reports/history/2026-04-05.json",
+    "Wrote standards history snapshot: docs/team-standards/reports/history/2026-04-06.json",
     "Updated standards history index: docs/team-standards/reports/history/index.json",
-    "Standards trend gate: no repeated warning/failure signals in last 1 entries",
+    "Standards trend gate: no repeated warning/failure signals in last 2 entries",
     "Updated standards remediation report: docs/team-standards/reports/remediation.json"
   ]
 }

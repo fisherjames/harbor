@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "maxCalibrationAgeDays": 31,
+  "historyRetentionDays": 45,
+  "requiredFiles": [
+    "docs/evaluator/README.md",
+    "docs/evaluator/rubric.json",
+    "docs/evaluator/benchmarks/shared-benchmark.json",
+    "docs/evaluator/reports/latest.json",
+    "docs/evaluator/reports/history/index.json"
+  ],
+  "requiredRubricKeys": [
+    "rubricVersion",
+    "benchmarkSetId",
+    "calibratedAt",
+    "minimumAgreement",
+    "maximumDrift"
+  ]
+}

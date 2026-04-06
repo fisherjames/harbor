@@ -12,6 +12,8 @@ export interface ModelInvocation {
 export interface ModelInvocationResult {
   output: string;
   latencyMs: number;
+  confidence?: number | undefined;
+  confidenceRationale?: string | undefined;
   tokenUsage?: {
     inputTokens: number;
     outputTokens: number;
@@ -21,6 +23,7 @@ export interface ModelInvocationResult {
 
 export interface ModelProvider {
   generate(input: ModelInvocation): Promise<ModelInvocationResult>;
+  describe?(): Record<string, unknown>;
 }
 
 export interface IdempotentRunLookupResult {
@@ -65,6 +68,24 @@ export interface StandardsRemediationProvider {
   load(): Promise<StandardsRemediationSnapshot | null>;
 }
 
+export interface PromptEnvelopePolicy {
+  platformSystemPrompt?: string | undefined;
+  workflowSystemPrompt?: string | undefined;
+  stageDirectives?: Partial<Record<RunStage, string>> | undefined;
+}
+
+export interface PolicyVerificationResult {
+  valid: boolean;
+  reasons: string[];
+  policyVersion?: string | undefined;
+  signature?: string | undefined;
+  computedChecksum?: string | undefined;
+}
+
+export interface WorkflowPolicyVerifier {
+  verify(workflow: WorkflowDefinition): PolicyVerificationResult;
+}
+
 export interface WorkflowRunnerDependencies {
   model: ModelProvider;
   memu: MemuClient;
@@ -72,5 +93,11 @@ export interface WorkflowRunnerDependencies {
   tracer: HarborRunTracer;
   runIsolation?: RunIsolationManager | undefined;
   standardsRemediationProvider?: StandardsRemediationProvider | undefined;
+  promptEnvelopePolicy?: PromptEnvelopePolicy | undefined;
+  policyVerifier?: WorkflowPolicyVerifier | undefined;
+  confidenceGatePolicy?: {
+    threshold: number;
+    stages?: RunStage[] | undefined;
+  } | undefined;
   maxFixAttempts?: number;
 }

@@ -25,6 +25,8 @@ export interface StageExecutionRecord {
   completedAt: string;
   prompt: string;
   output: string;
+  confidence?: number | undefined;
+  confidenceRationale?: string | undefined;
   attempts: number;
   tokenUsage?: {
     inputTokens: number;

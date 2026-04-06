@@ -1,5 +1,5 @@
 {
-  "currentPhase": "phase-2.6",
+  "currentPhase": "phase-3",
   "phases": [
     {
       "id": "phase-1",
@@ -46,7 +46,7 @@
     {
       "id": "phase-2.6",
       "name": "Team Standards Encoding",
-      "status": "in_progress",
+      "status": "complete",
       "evidence": [
         "docs/team-standards/README.md",
         "docs/team-standards/generation.md",
@@ -65,10 +65,50 @@
       ]
     },
     {
+      "id": "phase-2.8",
+      "name": "Harness Principles Addendum",
+      "status": "complete",
+      "evidence": [
+        "docs/exec-plans/completed/phase-2-8-harness-principles-addendum.md",
+        "docs/exec-plans/index.md",
+        "packages/engine/src/runtime/policy.ts",
+        "packages/engine/src/runtime/runner.ts",
+        "packages/api/src/router.ts",
+        "apps/web/src/server/dependencies.ts",
+        "apps/worker/src/inngest.ts",
+        "scripts/replay-verify.mjs",
+        "scripts/policy-bundle.mjs",
+        "scripts/evaluator-calibration-check.mjs",
+        "scripts/adversarial-taxonomy-check.mjs",
+        "docs/policies/harness-policy-v1.json",
+        "docs/adversarial/workflows/nightly-fixtures.json",
+        "docs/adversarial/reports/latest.json",
+        "docs/strategy/adversarial-taxonomy-contract.json",
+        "docs/evaluator/rubric.json",
+        "docs/strategy/evaluator-calibration-contract.json",
+        "docs/architecture/decision-records/0010-shadow-and-evaluator-gates.md",
+        "docs/architecture/decision-records/0011-adversarial-nightly-taxonomy-gate.md"
+      ]
+    },
+    {
       "id": "phase-3",
       "name": "Polished Production",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        "apps/worker/src/inngest.ts",
+        "apps/worker/test/inngest.test.ts",
+        "packages/database/src/repositories/run-store.ts",
+        "packages/database/src/repositories/in-memory-run-persistence.ts",
+        "packages/database/src/repositories/postgres-run-persistence.ts",
+        "packages/database/test/repositories.test.ts",
+        "packages/api/src/router.ts",
+        "packages/api/src/types.ts",
+        "packages/api/test/router.test.ts",
+        "docs/architecture/decision-records/0012-benchmark-to-production-bridge.md",
+        "docs/features/harness-features.json",
+        "docs/strategy/features-contract.json",
+        "scripts/features-drift-check.mjs"
+      ]
     },
     {
       "id": "phase-4",

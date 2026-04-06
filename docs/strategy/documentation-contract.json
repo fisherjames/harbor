@@ -6,6 +6,13 @@
     "docs/architecture/ARCHITECTURE.md",
     "docs/strategy/agent-legibility-contract.json",
     "docs/strategy/repository-legibility-map.json",
+    "docs/strategy/evaluator-calibration-contract.json",
+    "docs/strategy/adversarial-taxonomy-contract.json",
+    "docs/strategy/features-contract.json",
+    "docs/features/README.md",
+    "docs/features/harness-features.json",
+    "docs/evaluator/README.md",
+    "docs/adversarial/README.md",
     "docs/team-standards/README.md",
     "docs/strategy/team-standards-contract.json"
   ],
@@ -23,8 +30,11 @@
       "pnpm check",
       "pnpm vision:check",
       "pnpm docs:check",
+      "pnpm features:check",
       "pnpm legibility:check",
-      "pnpm standards:check"
+      "pnpm standards:check",
+      "pnpm evaluator:check",
+      "pnpm adversarial:check"
     ],
     "requiredPhrases": [
       "worktree-bound",

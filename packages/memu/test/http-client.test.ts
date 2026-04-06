@@ -6,7 +6,19 @@ describe("HttpMemuClient", () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          items: [{ id: "1", title: "t", content: "c", relevance: 0.9 }]
+          items: [
+            {
+              id: "1",
+              title: "t",
+              content: "c",
+              relevance: 0.9,
+              trust: {
+                source: "verified_kb",
+                confidence: 0.88,
+                lastValidatedAt: "2026-04-06T00:00:00.000Z"
+              }
+            }
+          ]
         }),
         { status: 200 }
       )
@@ -21,6 +33,7 @@ describe("HttpMemuClient", () => {
     });
 
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.trust?.confidence).toBe(0.88);
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 

@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/context/read"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "id": "memu-local-1",
+          "title": "Harbor local context",
+          "content": "Local memU mock context for Harbor runs.",
+          "relevance": 0.81,
+          "source": "memu-mock",
+          "trust": {
+            "source": "memu-mock",
+            "confidence": 0.74,
+            "lastValidatedAt": "2026-04-06T00:00:00.000Z"
+          }
+        }
+      ],
+      "compressedPrompt": "Use concise local context from memU mock."
+    }
+  }
+}

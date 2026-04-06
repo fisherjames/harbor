@@ -1,7 +1,7 @@
 # @harbor/worker
 
 ## Purpose
-Durable workflow execution workers using Inngest, including run isolation setup and teardown.
+Durable workflow execution workers using Inngest, including run isolation lifecycle, scheduled nightly adversarial scans, and scheduled stuck-run recovery scans.
 
 ## Entrypoints
 - `src/inngest.ts`: event handlers and execution triggers.
@@ -11,3 +11,5 @@ Durable workflow execution workers using Inngest, including run isolation setup 
 ## Commands
 - `pnpm --filter @harbor/worker typecheck`
 - `pnpm --filter @harbor/worker test`
+- `pnpm --filter @harbor/worker build`
+- `pnpm --filter @harbor/worker start:inngest`

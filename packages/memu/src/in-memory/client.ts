@@ -4,6 +4,7 @@ import type {
   MemuContextRequest,
   MemuContextResponse,
   MemuHealthcheck,
+  MemuTrustMetadata,
   MemuWriteInput,
   MemuWriteResult
 } from "../types.js";
@@ -16,6 +17,40 @@ interface StoredMemory {
   category: string;
   path: string;
   content: string;
+  trust: MemuTrustMetadata;
+}
+
+function defaultTrust(): MemuTrustMetadata {
+  return {
+    source: "in-memory",
+    confidence: 0.75
+  };
+}
+
+function parseTrustMetadata(metadata: MemuWriteInput["metadata"]): MemuTrustMetadata {
+  const base = defaultTrust();
+
+  if (!metadata) {
+    return base;
+  }
+
+  const rawSource = metadata["trustSource"];
+  const rawConfidence = metadata["trustConfidence"];
+  const rawLastValidatedAt = metadata["lastValidatedAt"];
+
+  const source = typeof rawSource === "string" && rawSource.trim().length > 0 ? rawSource : base.source;
+  const confidence =
+    typeof rawConfidence === "number" && Number.isFinite(rawConfidence)
+      ? Math.max(0, Math.min(1, Number(rawConfidence.toFixed(4))))
+      : base.confidence;
+  const lastValidatedAt =
+    typeof rawLastValidatedAt === "string" && rawLastValidatedAt.trim().length > 0 ? rawLastValidatedAt : undefined;
+
+  return {
+    source,
+    confidence,
+    ...(lastValidatedAt ? { lastValidatedAt } : {})
+  };
 }
 
 export class InMemoryMemuClient implements MemuClient {
@@ -39,7 +74,8 @@ export class InMemoryMemuClient implements MemuClient {
         title: `${entry.category}:${entry.path}`,
         content: entry.content,
         relevance: 0.75,
-        source: "in-memory"
+        source: "in-memory",
+        trust: entry.trust
       }));
 
     return {
@@ -64,7 +100,8 @@ export class InMemoryMemuClient implements MemuClient {
       agentId: input.agentId,
       category: input.category,
       path: input.path,
-      content: input.content
+      content: input.content,
+      trust: parseTrustMetadata(input.metadata)
     });
 
     return {

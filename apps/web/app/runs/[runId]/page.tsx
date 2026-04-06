@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
 import { escalateRunAction } from "../../actions";
-import type { RunDetail } from "@harbor/api";
+import { deriveMemoryTrustMetricsFromArtifacts } from "@harbor/observability";
 
 interface RunDetailPageProps {
   params: Promise<{
@@ -10,11 +10,49 @@ interface RunDetailPageProps {
   }>;
 }
 
+function parseJsonArtifact<T>(value: string | undefined): T | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default async function RunDetailPage({ params }: RunDetailPageProps) {
   const { runId } = await params;
   const requestHeaders = await headers();
   const caller = await createServerCaller({ headers: requestHeaders });
-  const run = (await caller.getRun({ runId })) as RunDetail;
+  const run = await caller.getRun({ runId });
+
+  if (!run) {
+    return (
+      <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system", maxWidth: 760 }}>
+        <p>
+          <Link href="/">Back to runs</Link>
+        </p>
+        <h1>Run Not Found</h1>
+        <p>
+          Run <code>{runId}</code> is not visible in the current tenant/workspace context.
+        </p>
+      </main>
+    );
+  }
+
+  const replayManifest = parseJsonArtifact<Record<string, unknown>>(run.artifacts["replay-bundle-manifest"]);
+  const replayTaxonomy = parseJsonArtifact<Record<string, number>>(run.artifacts["replay-divergence-taxonomy"]);
+  const replayDivergenceCount = replayTaxonomy
+    ? Object.values(replayTaxonomy).reduce((sum, value) => sum + value, 0)
+    : 0;
+  const replayParityStatus = replayManifest
+    ? replayDivergenceCount === 0
+      ? "parity_baseline_recorded"
+      : "divergence_detected"
+    : "missing_replay_manifest";
+  const memoryTrustMetrics = deriveMemoryTrustMetricsFromArtifacts(run.artifacts);
 
   return (
     <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system", maxWidth: 1100 }}>
@@ -68,6 +106,9 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                   {new Date(stage.startedAt).toLocaleString()} | completed:{" "}
                   {new Date(stage.completedAt).toLocaleString()}
                 </p>
+                <p>
+                  Confidence: {typeof stage.confidence === "number" ? stage.confidence.toFixed(2) : "n/a"}
+                </p>
                 <details>
                   <summary>Prompt</summary>
                   <pre style={{ whiteSpace: "pre-wrap", background: "#f6f6f6", padding: 10 }}>{stage.prompt}</pre>
@@ -80,6 +121,33 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             ))}
           </ol>
         )}
+      </section>
+      <section style={{ marginTop: 20 }}>
+        <h2>Replay Parity</h2>
+        <p>
+          <strong>Status:</strong> {replayParityStatus}
+        </p>
+        <p>
+          <strong>Divergence count:</strong> {replayDivergenceCount}
+        </p>
+      </section>
+      <section style={{ marginTop: 20 }}>
+        <h2>Memory Trust + Conflict Metrics</h2>
+        <p>
+          Memory reads: {memoryTrustMetrics.memoryReadCount} (monitor: {memoryTrustMetrics.monitorReadCount}, reason:{" "}
+          {memoryTrustMetrics.reasonReadCount})
+        </p>
+        <p>
+          Conflict artifacts: {memoryTrustMetrics.stageConflictArtifactCount} | Latest conflict groups:{" "}
+          {memoryTrustMetrics.latestConflictCount}
+        </p>
+        <p>
+          Latest dropped memory items: {memoryTrustMetrics.latestDroppedMemoryCount} | Conflict rate:{" "}
+          {memoryTrustMetrics.conflictRate}
+        </p>
+        {memoryTrustMetrics.latestDroppedMemoryIds.length > 0 ? (
+          <p>Latest dropped IDs: {memoryTrustMetrics.latestDroppedMemoryIds.join(", ")}</p>
+        ) : null}
       </section>
       <section style={{ marginTop: 20 }}>
         <h2>Artifacts</h2>

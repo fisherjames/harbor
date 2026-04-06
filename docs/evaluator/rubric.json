@@ -1,0 +1,7 @@
+{
+  "rubricVersion": "rubric-v1",
+  "benchmarkSetId": "shared-benchmark-v1",
+  "calibratedAt": "2026-04-06T00:00:00.000Z",
+  "minimumAgreement": 0.85,
+  "maximumDrift": 0.15
+}

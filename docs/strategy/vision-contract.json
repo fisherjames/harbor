@@ -37,7 +37,10 @@
     "docs/architecture/decision-records/0006-deploy-eval-and-promotion-gates.md",
     "docs/architecture/decision-records/0007-agent-legibility-drift-gate.md",
     "docs/architecture/decision-records/0008-team-standards-encoding-gate.md",
-    "docs/architecture/decision-records/0009-repository-legibility-map.md"
+    "docs/architecture/decision-records/0009-repository-legibility-map.md",
+    "docs/architecture/decision-records/0010-shadow-and-evaluator-gates.md",
+    "docs/architecture/decision-records/0011-adversarial-nightly-taxonomy-gate.md",
+    "docs/architecture/decision-records/0012-benchmark-to-production-bridge.md"
   ],
   "requiredPolicies": {
     "projectScopedOnly": true,
@@ -47,6 +50,10 @@
     "runCanBuildWholeStack": true,
     "ephemeralObservabilityPerRun": true,
     "evalGateOnDeploy": true,
+    "shadowRegressionGate": true,
+    "evaluatorCalibrationGate": true,
+    "adversarialNightlyTaxonomyGate": true,
+    "featureCatalogGate": true,
     "githubPromotionChecks": true,
     "agentLegibilityGate": true,
     "teamStandardsEncodingGate": true

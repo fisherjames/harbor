@@ -1,0 +1,30 @@
+{
+  "benchmarkSetId": "shared-benchmark-v1",
+  "observations": [
+    {
+      "scenarioId": "verify-structure",
+      "expectedVerdict": "pass",
+      "observedVerdict": "pass"
+    },
+    {
+      "scenarioId": "tool-budget-policy",
+      "expectedVerdict": "pass",
+      "observedVerdict": "pass"
+    },
+    {
+      "scenarioId": "memory-policy-shape",
+      "expectedVerdict": "pass",
+      "observedVerdict": "pass"
+    },
+    {
+      "scenarioId": "lint-pressure",
+      "expectedVerdict": "pass",
+      "observedVerdict": "pass"
+    },
+    {
+      "scenarioId": "publish-readiness",
+      "expectedVerdict": "pass",
+      "observedVerdict": "pass"
+    }
+  ]
+}

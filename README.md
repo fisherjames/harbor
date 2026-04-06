@@ -41,7 +41,20 @@ This repository currently contains a working Phase 1 foundation:
 pnpm install
 ```
 
-2. Run quality checks:
+2. Configure env for real provider runs:
+
+```bash
+cp .env.example .env
+```
+
+Set providers:
+- `HARBOR_MODEL_PROVIDER=openai` + `OPENAI_API_KEY` for real model calls.
+- `HARBOR_MODEL_PROVIDER=echo` for deterministic local runs without external model APIs.
+- Keep `MEMU_ENDPOINT=http://memu-mock:8080` when using the Docker memU mock.
+- Optional GitHub promotion provider: `GITHUB_TOKEN`, `GITHUB_PROMOTION_REPOSITORY`.
+- Optional Clerk UI key: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
+
+3. Run quality checks:
 
 ```bash
 pnpm check
@@ -49,10 +62,30 @@ pnpm legibility:check
 pnpm standards:check
 ```
 
-3. Start local infra:
+4. Start full local Docker stack (web + worker + postgres + redis + memU mock + Inngest):
 
 ```bash
-docker compose up -d
+cp .env.docker.example .env
+docker compose up --build -d
+```
+
+5. If `3000` (or other defaults) are busy on your machine, override host ports in `.env`:
+
+```bash
+# example: keep container port 3000, expose as host 3005
+HARBOR_WEB_PORT=3005
+```
+
+6. Open local services:
+- Harbor web: `http://localhost:${HARBOR_WEB_PORT:-3000}`
+- Worker Inngest endpoint: `http://localhost:8289/api/inngest`
+- Inngest dev UI: `http://localhost:8288`
+- memU mock health: `http://localhost:8081/v1/health`
+
+7. Tail logs when needed:
+
+```bash
+docker compose logs -f web worker inngest
 ```
 
 ## Harness Linter Behavior

@@ -8,10 +8,12 @@ import type {
 } from "@harbor/engine";
 import type {
   EscalateRunInput,
+  ListStuckRunsInput,
   ListRunsInput,
   RunDetail,
   RunEscalationResult,
   RunStore,
+  StuckRunCandidate,
   RunStoreScope,
   RunSummary
 } from "./run-store.js";
@@ -231,6 +233,27 @@ export class InMemoryRunPersistence implements RunStore {
       status: "needs_human",
       updatedAt
     };
+  }
+
+  async listStuckRuns(input: ListStuckRunsInput): Promise<StuckRunCandidate[]> {
+    const staleAfterMs = Math.max(0, input.staleAfterSeconds) * 1000;
+    const nowMs = Date.now();
+
+    const staleRuns = [...this.runs.values()]
+      .filter((run) => run.status === "running")
+      .filter((run) => nowMs - new Date(run.updatedAt).getTime() >= staleAfterMs)
+      .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+      .slice(0, input.limit ?? 100);
+
+    return staleRuns.map((run) => ({
+      runId: run.runId,
+      tenantId: run.request.tenantId,
+      workspaceId: run.request.workspaceId,
+      workflowId: run.workflow.id,
+      status: "running",
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt
+    }));
   }
 
   getSnapshot(runId: string): RunRecord {

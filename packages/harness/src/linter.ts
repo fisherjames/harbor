@@ -11,6 +11,33 @@ import type {
   WorkflowDefinition
 } from "./types.js";
 
+const EXTENDED_REMEDIATION_BY_RULE: Record<
+  string,
+  Pick<RemediationRecommendation, "suggestion" | "templateTarget">
+> = {
+  HAR006: {
+    suggestion: "Promote system prompt baseline template with explicit role, constraints, and verification posture.",
+    templateTarget: "general"
+  },
+  HAR007: {
+    suggestion: "Promote system prompt constraint template using MUST/NEVER language.",
+    templateTarget: "verification"
+  },
+  HAR008: {
+    suggestion: "Promote system prompt verifier template with explicit PASS/FAIL acceptance expectations.",
+    templateTarget: "verification"
+  },
+  HAR009: {
+    suggestion:
+      "Promote system prompt stage-output contract template requiring confidence (0-1) for plan/verify/fix stages.",
+    templateTarget: "verification"
+  },
+  HAR010: {
+    suggestion: "Promote two-phase side-effect template enforcing propose -> preview -> commit for mutating tools.",
+    templateTarget: "tooling"
+  }
+};
+
 export function lintWorkflowDefinition(workflow: WorkflowDefinition): LintReport {
   const findings = applyCoreHarnessRules(workflow);
   const blocked = findings.some((finding) => finding.severity === "critical");
@@ -69,6 +96,11 @@ function recommendationForRule(ruleId: string): Pick<RemediationRecommendation, 
       suggestion: HAR_REMEDIATION_SUGGESTION_BY_RULE[ruleId],
       templateTarget: HAR_TEMPLATE_TARGET_BY_RULE[ruleId]
     };
+  }
+
+  const extendedRecommendation = EXTENDED_REMEDIATION_BY_RULE[ruleId];
+  if (extendedRecommendation) {
+    return extendedRecommendation;
   }
 
   return {

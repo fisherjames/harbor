@@ -17,7 +17,14 @@ const contextResponseSchema = z.object({
       title: z.string(),
       content: z.string(),
       relevance: z.number(),
-      source: z.string().optional()
+      source: z.string().optional(),
+      trust: z
+        .object({
+          source: z.string(),
+          confidence: z.number(),
+          lastValidatedAt: z.string().optional()
+        })
+        .optional()
     })
   ),
   compressedPrompt: z.string().optional()

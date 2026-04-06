@@ -8,9 +8,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -w -p tsconfig.build.json",
+    "start:inngest": "node ./scripts/start-inngest-server.mjs",
     "lint": "echo \"Worker lint is enforced by strict TS and runtime checks\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --coverage",
+    "test": "vitest run --coverage --no-cache",
     "clean": "rm -rf dist"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assembleStagePrompt, type WorkflowDefinition } from "../src/index.js";
+import { assembleStagePrompt, DEFAULT_STAGE_DIRECTIVES, type WorkflowDefinition } from "../src/index.js";
 
 const workflow: WorkflowDefinition = {
   id: "wf_1",
@@ -44,6 +44,43 @@ describe("assembleStagePrompt", () => {
     expect(prompt).toContain("Add timeout budget");
     expect(prompt).toContain("## Constraints");
     expect(prompt).toContain("## Memory Context");
+    expect(prompt).toContain("## Prompt Envelope");
+    expect(prompt).toContain("### Platform System Prompt");
+    expect(prompt).toContain("### Workflow System Prompt");
+    expect(prompt).toContain("### Stage Directive");
+  });
+
+  it("uses explicit prompt envelope overrides when provided", () => {
+    const prompt = assembleStagePrompt({
+      stage: "plan",
+      workflow,
+      baseTask: "Plan work",
+      platformSystemPrompt: "Platform policy override",
+      workflowSystemPrompt: "Workflow policy override",
+      stageDirective: "Custom planning directive"
+    });
+
+    expect(prompt).toContain("Platform policy override");
+    expect(prompt).toContain("Workflow policy override");
+    expect(prompt).toContain("Custom planning directive");
+  });
+
+  it("falls back to defaults when envelope overrides are blank", () => {
+    const prompt = assembleStagePrompt({
+      stage: "execute",
+      workflow: {
+        ...workflow,
+        systemPrompt: "   "
+      },
+      baseTask: "Execute work",
+      platformSystemPrompt: "   ",
+      workflowSystemPrompt: "   ",
+      stageDirective: "   "
+    });
+
+    expect(prompt).toContain("### Platform System Prompt\n(not provided)");
+    expect(prompt).toContain("### Workflow System Prompt\n(not provided)");
+    expect(prompt).toContain(DEFAULT_STAGE_DIRECTIVES.execute);
   });
 
   it("omits resolution and verifier sections when there are no lint findings", () => {

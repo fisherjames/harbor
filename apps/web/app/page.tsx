@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
 import { sampleWorkflow } from "@/src/lib/sample-workflow";
-import { runSampleWorkflowAction } from "./actions";
+import { openWorkflowBuilderAction, runSampleWorkflowAction } from "./actions";
 import type { RunSummary } from "@harbor/api";
 
 export default async function HomePage() {
@@ -20,9 +20,11 @@ export default async function HomePage() {
         <p>Workflow: {saveResult.workflowId}</p>
         <p>Blocked: {String(saveResult.blocked)}</p>
         <p>Findings: {saveResult.lintFindings.length}</p>
-        <p>
-          <Link href={`/workflows/${sampleWorkflow.id}/builder`}>Open workflow builder</Link>
-        </p>
+        <form action={openWorkflowBuilderAction}>
+          <button type="submit" style={{ padding: "8px 14px" }}>
+            Open workflow builder
+          </button>
+        </form>
       </section>
       <section style={{ marginTop: 24 }}>
         <h2>Run Workflow</h2>
@@ -65,16 +67,7 @@ export default async function HomePage() {
               {runs.map((run) => (
                 <tr key={run.runId}>
                   <td style={{ padding: "8px 4px" }}>
-                    <Link
-                      href={{
-                        pathname: "/runs/[runId]",
-                        query: {
-                          runId: run.runId
-                        }
-                      }}
-                    >
-                      {run.runId}
-                    </Link>
+                    <Link href={`/runs/${run.runId}`}>{run.runId}</Link>
                   </td>
                   <td style={{ padding: "8px 4px" }}>{run.workflowId}</td>
                   <td style={{ padding: "8px 4px" }}>{run.status}</td>

@@ -159,6 +159,44 @@ describe("InMemoryRunPersistence", () => {
     await expect(persistence.getRun({ tenantId: "t", workspaceId: "w" }, "missing")).resolves.toBeNull();
   });
 
+  it("lists stuck running runs across scopes for recovery scans", async () => {
+    const persistence = new InMemoryRunPersistence();
+    const staleRunId = await persistence.createRun(request, workflow);
+    const freshRunId = await persistence.createRun(
+      {
+        ...request,
+        workflowId: "wf_fresh"
+      },
+      {
+        ...workflow,
+        id: "wf_fresh"
+      }
+    );
+
+    await persistence.updateStatus(staleRunId, "running");
+    await persistence.updateStatus(freshRunId, "running");
+
+    const runs = (persistence as unknown as {
+      runs: Map<string, { updatedAt: string }>;
+    }).runs;
+    runs.get(staleRunId)!.updatedAt = "2026-01-01T00:00:00.000Z";
+    runs.get(freshRunId)!.updatedAt = new Date(Date.now() + 60_000).toISOString();
+
+    const stuck = await persistence.listStuckRuns({
+      staleAfterSeconds: 60,
+      limit: 10
+    });
+
+    const stuckDefaultLimit = await persistence.listStuckRuns({
+      staleAfterSeconds: 60
+    });
+
+    expect(stuck).toHaveLength(1);
+    expect(stuck[0]?.runId).toBe(staleRunId);
+    expect(stuck[0]?.status).toBe("running");
+    expect(stuckDefaultLimit).toHaveLength(1);
+  });
+
   it("deduplicates run starts and transition keys when idempotency keys are reused", async () => {
     const persistence = new InMemoryRunPersistence();
 
@@ -503,6 +541,54 @@ describe("PostgresRunPersistence", () => {
     });
 
     expect(db.calls.length).toBe(3);
+  });
+
+  it("lists stuck runs using status and updated_at threshold filters", async () => {
+    const db = new FakeDb([
+      {
+        rows: [
+          {
+            id: "run_stuck",
+            tenant_id: "tenant_1",
+            workspace_id: "workspace_1",
+            workflow_id: "wf_1",
+            status: "running",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:10:00.000Z"
+          }
+        ],
+        rowCount: 1
+      },
+      {
+        rows: [],
+        rowCount: 0
+      }
+    ]);
+
+    const persistence = new PostgresRunPersistence(db);
+    const stuck = await persistence.listStuckRuns({
+      staleAfterSeconds: 900,
+      limit: 5
+    });
+
+    expect(stuck).toEqual([
+      {
+        runId: "run_stuck",
+        tenantId: "tenant_1",
+        workspaceId: "workspace_1",
+        workflowId: "wf_1",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:10:00.000Z"
+      }
+    ]);
+    expect(db.calls[0]?.text.includes("status = 'running'")).toBe(true);
+
+    const defaultLimit = await persistence.listStuckRuns({
+      staleAfterSeconds: 60
+    });
+    expect(defaultLimit).toEqual([]);
+    expect(db.calls[1]?.values?.[1]).toBe(100);
   });
 
   it("deduplicates updateStatus transitions using transition markers", async () => {

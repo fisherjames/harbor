@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "featureCatalogPath": "docs/features/harness-features.json",
+  "requiredDocuments": [
+    "docs/features/README.md",
+    "docs/features/harness-features.json",
+    "docs/strategy/phase-tracker.json"
+  ],
+  "allowedStatuses": [
+    "planned",
+    "in_progress",
+    "complete"
+  ],
+  "requiredFeatureIds": [
+    "typed-trpc-contract-surface",
+    "staged-runtime-plan-execute-verify-fix",
+    "harness-lint-remediation-loop",
+    "memu-retrieval-writeback-policy",
+    "workflow-builder-version-lifecycle",
+    "deploy-gates-eval-shadow-adversarial-github",
+    "policy-bundle-signing-provenance",
+    "deterministic-replay-parity",
+    "confidence-gated-autonomy",
+    "two-phase-side-effect-enforcement",
+    "evaluator-calibration-gate",
+    "adversarial-smoke-nightly-taxonomy-gate",
+    "worktree-bound-run-isolation",
+    "ephemeral-observability-envelope",
+    "memory-trust-conflict-metrics",
+    "stuck-run-detection-recovery",
+    "benchmark-to-production-bridge",
+    "machine-drift-gate-stack"
+  ],
+  "requiredReferences": [
+    {
+      "path": "docs/README.md",
+      "pattern": "docs/features/README.md"
+    },
+    {
+      "path": "docs/getting-started.md",
+      "pattern": "pnpm features:check"
+    }
+  ]
+}

@@ -126,6 +126,8 @@ if (!apiRouter.includes("if (!ctx.tenantId || !ctx.workspaceId || !ctx.actorId)"
   pass("Tenancy guard present in API router");
 }
 
+const workerInngest = readText("apps/worker/src/inngest.ts");
+
 if (!apiRouter.includes('runLintAtExecutionPoint("deploy", version.workflow)')) {
   fail("Publish drift: deploy lint execution missing before publish");
 } else {
@@ -175,6 +177,26 @@ if (visionContract.requiredPolicies?.githubPromotionChecks) {
     fail("Vision drift: GitHub promotion requirement missing from vision.md");
   } else {
     pass("Vision includes GitHub promotion requirement");
+  }
+}
+
+if (visionContract.requiredPolicies?.shadowRegressionGate) {
+  if (!apiRouter.includes("runShadowGate")) {
+    fail("Shadow gate drift: shadow gate hook is missing from API router");
+  } else {
+    pass("API router includes shadow gate hook");
+  }
+
+  if (!apiRouter.includes('"shadow"')) {
+    fail("Shadow gate drift: shadow blocked reason is missing from API router contracts");
+  } else {
+    pass("API router includes shadow blocked reason handling");
+  }
+
+  if (!/shadow/.test(normalizedVisionDoc)) {
+    fail("Vision drift: shadow regression requirement missing from vision.md");
+  } else {
+    pass("Vision includes shadow regression requirement");
   }
 }
 
@@ -284,6 +306,132 @@ if (visionContract.requiredPolicies?.teamStandardsEncodingGate) {
   }
 }
 
+if (visionContract.requiredPolicies?.evaluatorCalibrationGate) {
+  if (!fileExists("scripts/evaluator-calibration-check.mjs")) {
+    fail("Evaluator drift: scripts/evaluator-calibration-check.mjs is missing");
+  } else {
+    pass("Evaluator drift check script exists");
+  }
+
+  if (!hasScript("package.json", "evaluator:check")) {
+    fail("Evaluator drift: package.json missing evaluator:check script");
+  } else {
+    pass("Root package exposes evaluator:check script");
+  }
+
+  const rootPkg = readJson("package.json");
+  const rootCheck = String(rootPkg.scripts?.check ?? "");
+  if (!rootCheck.includes("pnpm evaluator:check")) {
+    fail("Evaluator drift: root check script does not include pnpm evaluator:check");
+  } else {
+    pass("Root check script includes evaluator calibration gate");
+  }
+
+  if (!fileExists("docs/strategy/evaluator-calibration-contract.json")) {
+    fail("Evaluator drift: docs/strategy/evaluator-calibration-contract.json is missing");
+  } else {
+    pass("Evaluator calibration contract exists");
+  }
+
+  if (!apiRouter.includes("calibration:")) {
+    fail("Evaluator drift: eval gate response no longer includes calibration metadata");
+  } else {
+    pass("API router includes eval calibration metadata");
+  }
+
+  if (!/evaluator/.test(normalizedVisionDoc)) {
+    fail("Vision drift: evaluator calibration requirement missing from vision.md");
+  } else {
+    pass("Vision includes evaluator calibration requirement");
+  }
+}
+
+if (visionContract.requiredPolicies?.adversarialNightlyTaxonomyGate) {
+  if (!fileExists("scripts/adversarial-taxonomy-check.mjs")) {
+    fail("Adversarial drift: scripts/adversarial-taxonomy-check.mjs is missing");
+  } else {
+    pass("Adversarial taxonomy check script exists");
+  }
+
+  if (!hasScript("package.json", "adversarial:check")) {
+    fail("Adversarial drift: package.json missing adversarial:check script");
+  } else {
+    pass("Root package exposes adversarial:check script");
+  }
+
+  const rootPkg = readJson("package.json");
+  const rootCheck = String(rootPkg.scripts?.check ?? "");
+  if (!rootCheck.includes("pnpm adversarial:check")) {
+    fail("Adversarial drift: root check script does not include pnpm adversarial:check");
+  } else {
+    pass("Root check script includes adversarial taxonomy gate");
+  }
+
+  if (!workerInngest.includes("adversarialNightlyScheduled")) {
+    fail("Adversarial drift: worker nightly scheduled function is missing");
+  } else {
+    pass("Worker includes adversarial nightly scheduled function");
+  }
+
+  if (!workerInngest.includes('cron: "0 3 * * *"')) {
+    fail("Adversarial drift: worker nightly schedule cron is missing");
+  } else {
+    pass("Worker nightly schedule cron is configured");
+  }
+
+  if (!apiRouter.includes("taxonomy:")) {
+    fail("Adversarial drift: API adversarial gate no longer includes taxonomy metadata");
+  } else {
+    pass("API adversarial gate includes taxonomy metadata");
+  }
+
+  if (!/adversarial/.test(normalizedVisionDoc) || !/taxonomy/.test(normalizedVisionDoc)) {
+    fail("Vision drift: adversarial nightly taxonomy requirement missing from vision.md");
+  } else {
+    pass("Vision includes adversarial nightly taxonomy requirement");
+  }
+}
+
+if (visionContract.requiredPolicies?.featureCatalogGate) {
+  if (!fileExists("scripts/features-drift-check.mjs")) {
+    fail("Feature drift: scripts/features-drift-check.mjs is missing");
+  } else {
+    pass("Feature drift check script exists");
+  }
+
+  if (!hasScript("package.json", "features:check")) {
+    fail("Feature drift: package.json missing features:check script");
+  } else {
+    pass("Root package exposes features:check script");
+  }
+
+  const rootPkg = readJson("package.json");
+  const rootCheck = String(rootPkg.scripts?.check ?? "");
+  if (!rootCheck.includes("pnpm features:check")) {
+    fail("Feature drift: root check script does not include pnpm features:check");
+  } else {
+    pass("Root check script includes feature catalog gate");
+  }
+
+  if (!fileExists("docs/strategy/features-contract.json")) {
+    fail("Feature drift: docs/strategy/features-contract.json is missing");
+  } else {
+    pass("Feature contract exists");
+  }
+
+  if (!fileExists("docs/features/README.md")) {
+    fail("Feature drift: docs/features/README.md is missing");
+  } else {
+    pass("Feature README exists");
+  }
+
+  if (!/feature\s+catalog/.test(normalizedVisionDoc)) {
+    fail("Vision drift: feature catalog requirement missing from vision.md");
+  } else {
+    pass("Vision includes feature catalog requirement");
+  }
+}
+
 if (visionContract.requiredPolicies?.worktreeBoundRuns) {
   if (!/worktree\s+bound/.test(normalizedVisionDoc)) {
     fail("Vision drift: worktree-bound run policy missing from vision.md");
@@ -336,6 +484,33 @@ for (const phase of trackedPhases) {
   for (const evidencePath of phase.evidence ?? []) {
     if (!fileExists(evidencePath)) {
       fail(`Phase tracker drift: missing evidence path '${evidencePath}' for ${phase.id}`);
+    }
+  }
+}
+
+const activePlansReadmePath = "docs/exec-plans/active/README.md";
+if (!fileExists(activePlansReadmePath)) {
+  fail("Execution plan drift: docs/exec-plans/active/README.md is missing");
+} else {
+  const activePlansReadme = readText(activePlansReadmePath);
+  const activePlanMatches = [...activePlansReadme.matchAll(/docs\/exec-plans\/active\/[a-zA-Z0-9._-]+\.md/g)];
+  const activePlanRelativePath = activePlanMatches[0]?.[0];
+
+  if (!activePlanRelativePath) {
+    fail("Execution plan drift: active plan README does not reference a current active plan file");
+  } else {
+    if (!fileExists(activePlanRelativePath)) {
+      fail(`Execution plan drift: active plan file is missing at '${activePlanRelativePath}'`);
+    } else {
+      pass(`Active execution plan file exists: ${activePlanRelativePath}`);
+    }
+
+    if (!activePlanRelativePath.includes(currentPhase)) {
+      fail(
+        `Execution plan drift: active plan '${activePlanRelativePath}' does not align with currentPhase '${currentPhase}'`
+      );
+    } else {
+      pass(`Active execution plan aligns with currentPhase: ${currentPhase}`);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import pg from "pg";
 import type { LintFinding, WorkflowDefinition } from "@harbor/harness";
 import type {
   IdempotentRunLookupResult,
@@ -9,14 +9,18 @@ import type {
 } from "@harbor/engine";
 import type {
   EscalateRunInput,
+  ListStuckRunsInput,
   ListRunsInput,
   RunDetail,
   RunEscalationResult,
   RunStore,
+  StuckRunCandidate,
   RunStoreScope,
   RunSummary
 } from "./run-store.js";
 import { tokenUsageFromStages } from "./run-store.js";
+
+const { Pool } = pg;
 
 interface QueryResult<Row> {
   rows: Row[];
@@ -52,6 +56,16 @@ interface StageRow {
 interface ArtifactRow {
   name: string;
   value: string;
+}
+
+interface StuckRunRow {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
+  workflow_id: string;
+  status: "running";
+  created_at: Date | string;
+  updated_at: Date | string;
 }
 
 function hashToken(value: string): string {
@@ -476,6 +490,31 @@ export class PostgresRunPersistence implements RunStore {
       status: "needs_human",
       updatedAt
     };
+  }
+
+  async listStuckRuns(input: ListStuckRunsInput): Promise<StuckRunCandidate[]> {
+    const staleAfterSeconds = Math.max(0, input.staleAfterSeconds);
+    const limit = input.limit ?? 100;
+
+    const result = await this.db.query<StuckRunRow>(
+      `SELECT id, tenant_id, workspace_id, workflow_id, status, created_at, updated_at
+       FROM executions
+       WHERE status = 'running'
+         AND updated_at <= NOW() - ($1::integer * INTERVAL '1 second')
+       ORDER BY updated_at ASC
+       LIMIT $2`,
+      [staleAfterSeconds, limit]
+    );
+
+    return result.rows.map((row) => ({
+      runId: row.id,
+      tenantId: row.tenant_id,
+      workspaceId: row.workspace_id,
+      workflowId: row.workflow_id,
+      status: "running",
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at)
+    }));
   }
 
   private async hasTransitionMarker(runId: string, markerName: string): Promise<boolean> {

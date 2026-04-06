@@ -1,0 +1,16 @@
+{
+  "version": "policy-v1",
+  "issuedAt": "2026-04-05T00:00:00.000Z",
+  "constraints": {
+    "requireNodeOwner": true,
+    "requireNodeBudget": true,
+    "requireToolPolicy": true,
+    "requireMemoryPolicy": true,
+    "allowPromptMutationsOnlyInHarness": true
+  },
+  "runtime": {
+    "blockOnCriticalLint": true,
+    "maxFixAttempts": 1,
+    "requireReplayBundle": true
+  }
+}

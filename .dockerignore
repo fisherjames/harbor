@@ -1,0 +1,16 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+**/node_modules
+.pnpm-store
+.turbo
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.tmp
+.env
+.env.*
+!.env.example
+pnpm-debug.log*

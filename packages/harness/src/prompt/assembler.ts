@@ -1,4 +1,17 @@
-import type { AssemblePromptInput, LintFinding, PromptPatch } from "../types.js";
+import type { AssemblePromptInput, LintFinding, PromptPatch, PromptStage } from "../types.js";
+
+export const DEFAULT_PLATFORM_SYSTEM_PROMPT =
+  "You are Harbor runtime. Follow harness constraints, enforce tenancy boundaries, and return concise actionable outputs.";
+
+export const DEFAULT_STAGE_DIRECTIVES: Record<PromptStage, string> = {
+  plan:
+    "Build a bounded execution plan with explicit assumptions, dependencies, and success criteria. Return confidence (0-1) and optional rationale.",
+  execute: "Execute the approved plan, use only allowed tools, and persist relevant artifacts.",
+  verify:
+    "Validate outputs against objective and constraints, then return explicit PASS or FAIL with evidence plus confidence (0-1) and optional rationale.",
+  fix:
+    "Apply the minimal correction needed to address verification failures before re-verification, and return confidence (0-1) with optional rationale."
+};
 
 function uniquePreserveOrder(values: string[]): string[] {
   const seen = new Set<string>();
@@ -14,6 +27,36 @@ function uniquePreserveOrder(values: string[]): string[] {
   }
 
   return result;
+}
+
+function normalizePromptValue(value: string): string {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : "(not provided)";
+}
+
+export function resolveStageDirective(stage: PromptStage, override?: string): string {
+  const normalizedOverride = (override ?? "").trim();
+  if (normalizedOverride.length > 0) {
+    return normalizedOverride;
+  }
+
+  return DEFAULT_STAGE_DIRECTIVES[stage];
+}
+
+function renderPromptEnvelope(input: AssemblePromptInput): string {
+  const platformSystemPrompt = normalizePromptValue(input.platformSystemPrompt ?? DEFAULT_PLATFORM_SYSTEM_PROMPT);
+  const workflowSystemPrompt = normalizePromptValue(input.workflowSystemPrompt ?? input.workflow.systemPrompt);
+  const stageDirective = resolveStageDirective(input.stage, input.stageDirective);
+
+  return [
+    "## Prompt Envelope",
+    "### Platform System Prompt",
+    platformSystemPrompt,
+    "### Workflow System Prompt",
+    workflowSystemPrompt,
+    "### Stage Directive",
+    stageDirective
+  ].join("\n");
 }
 
 function renderPatchBlock(section: PromptPatch["section"], patches: PromptPatch[]): string {
@@ -97,6 +140,7 @@ export function assembleStagePrompt(input: AssemblePromptInput): string {
 
   const sections = [
     `# Harbor Harness Prompt\nStage: ${input.stage}`,
+    renderPromptEnvelope(input),
     `## Objective\n${input.workflow.objective}`,
     `## Task\n${input.baseTask}`,
     input.memoryContext ? `## Memory Context\n${input.memoryContext}` : "",

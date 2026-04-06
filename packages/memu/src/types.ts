@@ -16,6 +16,13 @@ export interface MemuContextItem {
   content: string;
   relevance: number;
   source?: string | undefined;
+  trust?: MemuTrustMetadata | undefined;
+}
+
+export interface MemuTrustMetadata {
+  source: string;
+  confidence: number;
+  lastValidatedAt?: string | undefined;
 }
 
 export interface MemuContextResponse {

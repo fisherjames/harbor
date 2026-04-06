@@ -17,10 +17,12 @@ export type {
   RunStore,
   RunStoreScope,
   ListRunsInput,
+  ListStuckRunsInput,
   EscalateRunInput,
   RunSummary,
   RunDetail,
   RunEscalationResult,
+  StuckRunCandidate,
   RunTokenUsage
 } from "./repositories/run-store.js";
 export { InMemoryWorkflowRegistry } from "./repositories/in-memory-workflow-registry.js";

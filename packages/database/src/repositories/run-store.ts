@@ -51,10 +51,26 @@ export interface RunEscalationResult {
   updatedAt: string;
 }
 
+export interface ListStuckRunsInput {
+  staleAfterSeconds: number;
+  limit?: number | undefined;
+}
+
+export interface StuckRunCandidate {
+  runId: string;
+  tenantId: string;
+  workspaceId: string;
+  workflowId: string;
+  status: "running";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RunStore extends RunPersistence {
   listRuns(scope: RunStoreScope, input?: ListRunsInput): Promise<RunSummary[]>;
   getRun(scope: RunStoreScope, runId: string): Promise<RunDetail | null>;
   escalateRun(scope: RunStoreScope, input: EscalateRunInput): Promise<RunEscalationResult | null>;
+  listStuckRuns(input: ListStuckRunsInput): Promise<StuckRunCandidate[]>;
 }
 
 export const DEFAULT_TOKEN_COST_PER_1K = 0.01;

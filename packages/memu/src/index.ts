@@ -2,6 +2,7 @@ export type {
   MemuMode,
   MemuContextRequest,
   MemuContextItem,
+  MemuTrustMetadata,
   MemuContextResponse,
   MemuWriteInput,
   MemuWriteResult,

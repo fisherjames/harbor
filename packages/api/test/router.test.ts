@@ -267,12 +267,94 @@ describe("createHarborRouter", () => {
     expect(result.blocked).toBe(false);
     expect(result.blockedReasons).toEqual([]);
     expect(result.evalGate.status).toBe("passed");
+    expect(result.evalGate.calibration.rubricVersion).toBe("rubric-v0");
     expect(result.promotionGate.status).toBe("passed");
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("passed");
+    expect(result.shadowGate.mode).toBe("active");
+    expect(result.bridge.target).toBe("deploy");
+    expect(result.bridge.nextAction).toBe("deploy_workflow");
+    expect(result.bridge.steps.map((step) => step.stepId)).toEqual([
+      "lint",
+      "eval",
+      "promotion",
+      "adversarial",
+      "shadow"
+    ]);
+  });
+
+  it("records default shadow comparison metadata for canary rollout mode", async () => {
+    const router = createRouter();
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: 1,
+      workflow: {
+        ...workflow,
+        rolloutMode: "canary"
+      }
+    });
+
+    expect(result.blocked).toBe(false);
+    expect(result.shadowGate.mode).toBe("canary");
+    expect(result.shadowGate.status).toBe("passed");
+    expect(result.shadowGate.comparison?.artifactPath).toContain(`/shadow/${workflow.id}/v${workflow.version}/deploy.json`);
+  });
+
+  it("rejects deploy when policy verification fails", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: false,
+            reasons: ["Policy signature is not trusted."]
+          };
+        }
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.deployWorkflow({
+        workflowId: workflow.id,
+        expectedVersion: workflow.version,
+        workflow
+      })
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED"
+    });
+  });
+
+  it("returns policy metadata on deploy when verifier passes", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "b".repeat(64)
+          };
+        }
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow
+    });
+
+    expect(result.policyVersion).toBe("policy-v1");
+    expect(result.policySignature).toBe("b".repeat(64));
   });
 
   it("skips eval and promotion gates when deploy lint is critical", async () => {
     const evalCalls: string[] = [];
     const promotionCalls: string[] = [];
+    const shadowCalls: string[] = [];
     const router = createRouter({
       async runEvalGate(_context, input) {
         evalCalls.push(input.event);
@@ -282,7 +364,17 @@ describe("createHarborRouter", () => {
           blocked: false,
           score: 1,
           summary: "ok",
-          failingScenarios: []
+          failingScenarios: [],
+          calibration: {
+            rubricVersion: "rubric-v1",
+            benchmarkSetId: "shared-benchmark-v1",
+            calibratedAt: "2026-04-06T00:00:00.000Z",
+            agreementScore: 1,
+            driftScore: 0,
+            minimumAgreement: 0.85,
+            maximumDrift: 0.15,
+            driftDetected: false
+          }
         };
       },
       async runPromotionChecks(_context, input) {
@@ -301,6 +393,15 @@ describe("createHarborRouter", () => {
             }
           ]
         };
+      },
+      async runShadowGate(_context, input) {
+        shadowCalls.push(input.event);
+        return {
+          mode: input.rolloutMode,
+          status: "passed",
+          blocked: false,
+          summary: "ok"
+        };
       }
     });
     const caller = router.createCaller(scopedContext);
@@ -318,8 +419,14 @@ describe("createHarborRouter", () => {
     expect(result.blockedReasons).toEqual(["lint"]);
     expect(result.evalGate.status).toBe("skipped");
     expect(result.promotionGate.status).toBe("skipped");
+    expect(result.adversarialGate.status).toBe("skipped");
+    expect(result.shadowGate.status).toBe("skipped");
+    expect(result.bridge.blocked).toBe(true);
+    expect(result.bridge.nextAction).toBe("halt_and_remediate");
+    expect(result.bridge.steps[0]?.status).toBe("failed");
     expect(evalCalls).toEqual([]);
     expect(promotionCalls).toEqual([]);
+    expect(shadowCalls).toEqual([]);
   });
 
   it("blocks deploy when eval gate fails", async () => {
@@ -332,7 +439,17 @@ describe("createHarborRouter", () => {
           blocked: true,
           score: 0.1,
           summary: "Regression detected",
-          failingScenarios: ["planner_regression"]
+          failingScenarios: ["planner_regression"],
+          calibration: {
+            rubricVersion: "rubric-v1",
+            benchmarkSetId: "shared-benchmark-v1",
+            calibratedAt: "2026-04-06T00:00:00.000Z",
+            agreementScore: 0.4,
+            driftScore: 0.6,
+            minimumAgreement: 0.85,
+            maximumDrift: 0.15,
+            driftDetected: true
+          }
         };
       },
       async runPromotionChecks(_context, input) {
@@ -364,6 +481,9 @@ describe("createHarborRouter", () => {
     expect(result.blocked).toBe(true);
     expect(result.blockedReasons).toContain("eval");
     expect(result.evalGate.status).toBe("failed");
+    expect(result.evalGate.calibration.driftDetected).toBe(true);
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(promotionCalls).toEqual(["deploy"]);
   });
 
@@ -397,6 +517,98 @@ describe("createHarborRouter", () => {
     expect(result.blocked).toBe(true);
     expect(result.blockedReasons).toContain("promotion");
     expect(result.promotionGate.status).toBe("failed");
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("skipped");
+  });
+
+  it("blocks deploy when adversarial gate fails", async () => {
+    const router = createRouter({
+      async runAdversarialGate() {
+        return {
+          suiteId: "adversarial-smoke",
+          status: "failed",
+          blocked: true,
+          summary: "Prompt injection exploit remained effective.",
+          findings: [
+            {
+              findingId: "adv_1",
+              scenarioId: "prompt_injection_override",
+              category: "prompt_injection",
+              severity: "critical",
+              summary: "User-controlled instructions overrode system constraints.",
+              resolutionSteps: [
+                "Append an explicit instruction hierarchy section to constraints.",
+                "Require verifier-stage confirmation that user content cannot relax tool policy."
+              ]
+            }
+          ],
+          taxonomy: {
+            totalFindings: 1,
+            criticalFindings: 1,
+            warningFindings: 0,
+            byCategory: {
+              prompt_injection: 1,
+              tool_permission_escalation: 0,
+              cross_tenant_access: 0,
+              memory_poisoning: 0
+            },
+            byScenario: {
+              prompt_injection_override: 1
+            }
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("adversarial");
+    expect(result.adversarialGate.status).toBe("failed");
+    expect(result.shadowGate.status).toBe("skipped");
+    expect(result.adversarialGate.findings).toHaveLength(1);
+    expect(result.adversarialGate.taxonomy.totalFindings).toBe(1);
+    expect(result.adversarialGate.findings[0]?.resolutionSteps[0]).toContain("instruction hierarchy");
+  });
+
+  it("blocks deploy when shadow gate fails", async () => {
+    const router = createRouter({
+      async runShadowGate(inputContext, input) {
+        return {
+          mode: input.rolloutMode,
+          status: "failed",
+          blocked: true,
+          summary: `Shadow parity failed for ${input.event} in ${inputContext.workspaceId}.`,
+          comparison: {
+            baselineRunId: "baseline:wf_1:v1:deploy",
+            candidateRunId: "candidate:wf_1:v1:deploy",
+            parityScore: 0.72,
+            divergenceCount: 4,
+            artifactPath: "harbor/shadow/wf_1/v1/deploy.json"
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.deployWorkflow({
+      workflowId: workflow.id,
+      expectedVersion: workflow.version,
+      workflow: {
+        ...workflow,
+        rolloutMode: "shadow"
+      }
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("shadow");
+    expect(result.shadowGate.status).toBe("failed");
+    expect(result.shadowGate.comparison?.divergenceCount).toBe(4);
   });
 
   it("lists workflow versions", async () => {
@@ -482,7 +694,47 @@ describe("createHarborRouter", () => {
     expect(result.blockedReasons).toEqual(["lint"]);
     expect(result.evalGate.status).toBe("skipped");
     expect(result.promotionGate.status).toBe("skipped");
+    expect(result.adversarialGate.status).toBe("skipped");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(publishCalls).toHaveLength(0);
+  });
+
+  it("returns policy metadata when publish is blocked and verifier passes", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "f".repeat(64)
+          };
+        }
+      },
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.policyVersion).toBe("policy-v1");
+    expect(result.policySignature).toBe("f".repeat(64));
   });
 
   it("blocks publish when eval gate fails before publish mutation", async () => {
@@ -495,7 +747,17 @@ describe("createHarborRouter", () => {
           blocked: true,
           score: 0.2,
           summary: "Regression detected",
-          failingScenarios: ["verify_budget"]
+          failingScenarios: ["verify_budget"],
+          calibration: {
+            rubricVersion: "rubric-v1",
+            benchmarkSetId: "shared-benchmark-v1",
+            calibratedAt: "2026-04-06T00:00:00.000Z",
+            agreementScore: 0.5,
+            driftScore: 0.5,
+            minimumAgreement: 0.85,
+            maximumDrift: 0.15,
+            driftDetected: true
+          }
         };
       },
       async publishWorkflowVersion(_context, input) {
@@ -519,6 +781,8 @@ describe("createHarborRouter", () => {
     expect(result.blocked).toBe(true);
     expect(result.blockedReasons).toContain("eval");
     expect(result.evalGate.status).toBe("failed");
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(publishCalls).toHaveLength(0);
   });
 
@@ -562,6 +826,71 @@ describe("createHarborRouter", () => {
     expect(result.blocked).toBe(true);
     expect(result.blockedReasons).toContain("promotion");
     expect(result.promotionGate.status).toBe("failed");
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("skipped");
+    expect(publishCalls).toHaveLength(0);
+  });
+
+  it("blocks publish when adversarial gate fails before publish mutation", async () => {
+    const publishCalls: string[] = [];
+    const router = createRouter({
+      async runAdversarialGate() {
+        return {
+          suiteId: "adversarial-smoke",
+          status: "failed",
+          blocked: true,
+          summary: "Cross-tenant access attempt was not denied.",
+          findings: [
+            {
+              findingId: "adv_2",
+              scenarioId: "cross_tenant_access_probe",
+              category: "cross_tenant_access",
+              severity: "critical",
+              summary: "Tenant scope bypass was observed in adversarial simulation.",
+              resolutionSteps: [
+                "Enforce tenant/workspace predicates in every router branch.",
+                "Add verifier check that run artifacts never include foreign tenant IDs."
+              ]
+            }
+          ],
+          taxonomy: {
+            totalFindings: 1,
+            criticalFindings: 1,
+            warningFindings: 0,
+            byCategory: {
+              prompt_injection: 0,
+              tool_permission_escalation: 0,
+              cross_tenant_access: 1,
+              memory_poisoning: 0
+            },
+            byScenario: {
+              cross_tenant_access_probe: 1
+            }
+          }
+        };
+      },
+      async publishWorkflowVersion(_context, input) {
+        publishCalls.push(`${input.workflowId}:${input.version}`);
+        return {
+          workflowId: input.workflowId,
+          version: input.version,
+          state: "published",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("adversarial");
+    expect(result.adversarialGate.status).toBe("failed");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(publishCalls).toHaveLength(0);
   });
 
@@ -615,8 +944,67 @@ describe("createHarborRouter", () => {
     expect(published.state).toBe("published");
     expect(published.blocked).toBe(false);
     expect(published.evalGate.status).toBe("passed");
+    expect(published.evalGate.calibration.rubricVersion).toBe("rubric-v0");
     expect(published.promotionGate.status).toBe("passed");
+    expect(published.adversarialGate.status).toBe("passed");
+    expect(published.shadowGate.status).toBe("passed");
     expect(published.blockedReasons).toEqual([]);
+    expect(published.bridge.target).toBe("publish");
+    expect(published.bridge.nextAction).toBe("publish_workflow");
+  });
+
+  it("records publish shadow comparison metadata for canary rollout mode", async () => {
+    const router = createRouter({
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            rolloutMode: "canary"
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const published = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(published.blocked).toBe(false);
+    expect(published.shadowGate.mode).toBe("canary");
+    expect(published.shadowGate.status).toBe("passed");
+    expect(published.shadowGate.summary).toContain("publish baseline");
+    expect(published.shadowGate.comparison?.artifactPath).toContain(`/shadow/${workflow.id}/v${workflow.version}/publish.json`);
+  });
+
+  it("returns policy metadata when publishing with verifier", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "c".repeat(64)
+          };
+        }
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const published = await caller.publishWorkflowVersion({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(published.policyVersion).toBe("policy-v1");
+    expect(published.policySignature).toBe("c".repeat(64));
   });
 
   it("returns not found when opening promotion pull request for unknown version", async () => {
@@ -679,10 +1067,50 @@ describe("createHarborRouter", () => {
     expect(result.blockedReasons).toEqual(["lint"]);
     expect(result.evalGate.status).toBe("skipped");
     expect(result.promotionGate.status).toBe("skipped");
+    expect(result.adversarialGate.status).toBe("skipped");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(result.promotion.status).toBe("skipped");
     expect(result.promotion.baseBranch).toBe("main");
     expect(result.promotion.headBranch).toContain("harbor/promotion/");
     expect(promotionCalls).toHaveLength(0);
+  });
+
+  it("returns policy metadata when promotion is blocked and verifier passes", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "1".repeat(64)
+          };
+        }
+      },
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            nodes: workflow.nodes.filter((node) => node.type !== "verifier")
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.policyVersion).toBe("policy-v1");
+    expect(result.policySignature).toBe("1".repeat(64));
   });
 
   it("skips opening promotion pull request when eval gate fails and preserves branch overrides", async () => {
@@ -695,7 +1123,17 @@ describe("createHarborRouter", () => {
           blocked: true,
           score: 0.25,
           summary: "Regression detected",
-          failingScenarios: ["executor_quality"]
+          failingScenarios: ["executor_quality"],
+          calibration: {
+            rubricVersion: "rubric-v1",
+            benchmarkSetId: "shared-benchmark-v1",
+            calibratedAt: "2026-04-06T00:00:00.000Z",
+            agreementScore: 0.55,
+            driftScore: 0.45,
+            minimumAgreement: 0.85,
+            maximumDrift: 0.15,
+            driftDetected: true
+          }
         };
       },
       async createPromotionPullRequest() {
@@ -721,9 +1159,133 @@ describe("createHarborRouter", () => {
 
     expect(result.blocked).toBe(true);
     expect(result.blockedReasons).toContain("eval");
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("skipped");
     expect(result.promotion.status).toBe("skipped");
     expect(result.promotion.baseBranch).toBe("release");
     expect(result.promotion.headBranch).toBe("harbor/promotion/custom");
+    expect(promotionCalls).toHaveLength(0);
+  });
+
+  it("skips opening promotion pull request when adversarial gate fails", async () => {
+    const promotionCalls: string[] = [];
+    const router = createRouter({
+      async runAdversarialGate() {
+        return {
+          suiteId: "adversarial-smoke",
+          status: "failed",
+          blocked: true,
+          summary: "Tool permission escalation test failed.",
+          findings: [
+            {
+              findingId: "adv_3",
+              scenarioId: "tool_permission_scope_escape",
+              category: "tool_permission_escalation",
+              severity: "critical",
+              summary: "Tool call executed outside declared permission scope.",
+              resolutionSteps: [
+                "Restrict tool permissions to explicit allow-list at deploy time.",
+                "Require verifier-stage assertion of expected tool call set."
+              ]
+            }
+          ],
+          taxonomy: {
+            totalFindings: 1,
+            criticalFindings: 1,
+            warningFindings: 0,
+            byCategory: {
+              prompt_injection: 0,
+              tool_permission_escalation: 1,
+              cross_tenant_access: 0,
+              memory_poisoning: 0
+            },
+            byScenario: {
+              tool_permission_scope_escape: 1
+            }
+          }
+        };
+      },
+      async createPromotionPullRequest() {
+        promotionCalls.push("called");
+        return {
+          repository: "owner/repo",
+          baseBranch: "main",
+          headBranch: "head",
+          artifactPath: "path",
+          status: "created",
+          summary: "should not run"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("adversarial");
+    expect(result.adversarialGate.status).toBe("failed");
+    expect(result.shadowGate.status).toBe("skipped");
+    expect(result.promotion.status).toBe("skipped");
+    expect(promotionCalls).toHaveLength(0);
+  });
+
+  it("skips opening promotion pull request when shadow gate fails", async () => {
+    const promotionCalls: string[] = [];
+    const router = createRouter({
+      async runShadowGate(_context, input) {
+        return {
+          mode: input.rolloutMode,
+          status: "failed",
+          blocked: true,
+          summary: "Shadow replay diverged from baseline.",
+          comparison: {
+            baselineRunId: "baseline:wf_1:v1:publish",
+            candidateRunId: "candidate:wf_1:v1:publish",
+            parityScore: 0.64,
+            divergenceCount: 5,
+            artifactPath: "harbor/shadow/wf_1/v1/publish.json"
+          }
+        };
+      },
+      async getWorkflowVersion() {
+        return {
+          workflowId: "wf_1",
+          version: 1,
+          state: "draft",
+          savedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+          savedBy: "user_1",
+          workflow: {
+            ...workflow,
+            rolloutMode: "shadow"
+          }
+        };
+      },
+      async createPromotionPullRequest() {
+        promotionCalls.push("called");
+        return {
+          repository: "owner/repo",
+          baseBranch: "main",
+          headBranch: "head",
+          artifactPath: "path",
+          status: "created",
+          summary: "should not run"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedReasons).toContain("shadow");
+    expect(result.shadowGate.status).toBe("failed");
+    expect(result.promotion.status).toBe("skipped");
     expect(promotionCalls).toHaveLength(0);
   });
 
@@ -772,9 +1334,37 @@ describe("createHarborRouter", () => {
     });
     expect(result.blocked).toBe(false);
     expect(result.blockedReasons).toEqual([]);
+    expect(result.adversarialGate.status).toBe("passed");
+    expect(result.shadowGate.status).toBe("passed");
+    expect(result.bridge.target).toBe("promotion");
+    expect(result.bridge.nextAction).toBe("open_promotion_pull_request");
     expect(result.promotion.status).toBe("created");
     expect(result.promotion.pullRequestNumber).toBe(77);
     expect(result.promotion.pullRequestUrl).toContain("/pull/77");
+  });
+
+  it("returns policy metadata when opening promotion pull request with verifier", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "d".repeat(64)
+          };
+        }
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.openPromotionPullRequest({
+      workflowId: workflow.id,
+      version: workflow.version
+    });
+
+    expect(result.policyVersion).toBe("policy-v1");
+    expect(result.policySignature).toBe("d".repeat(64));
   });
 
   it("accepts typed tool policy fields in workflow input", async () => {
@@ -811,6 +1401,16 @@ describe("createHarborRouter", () => {
     const calls: WorkflowRunRequest[] = [];
 
     const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: true,
+            reasons: [],
+            policyVersion: "policy-v1",
+            signature: "e".repeat(64)
+          };
+        }
+      },
       async runWorkflow(request) {
         calls.push(request);
         return {
@@ -868,6 +1468,32 @@ describe("createHarborRouter", () => {
     });
 
     expect(calls[0]?.idempotencyKey).toBe("idem-1");
+  });
+
+  it("rejects runWorkflow when policy verification fails", async () => {
+    const router = createRouter({
+      policyVerifier: {
+        verify() {
+          return {
+            valid: false,
+            reasons: ["Workflow is missing policyBundle."]
+          };
+        }
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.runWorkflow({
+        workflow,
+        trigger: "manual",
+        input: {
+          prompt: "hello"
+        }
+      })
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED"
+    });
   });
 
   it("returns runs list scoped to tenant context", async () => {

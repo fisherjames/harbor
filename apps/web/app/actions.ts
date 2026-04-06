@@ -25,6 +25,17 @@ export async function runSampleWorkflowAction(formData: FormData): Promise<void>
   redirect(`/runs/${run.runId}`);
 }
 
+export async function openWorkflowBuilderAction(): Promise<void> {
+  const requestHeaders = await headers();
+  const caller = await createServerCaller({ headers: requestHeaders });
+
+  await caller.saveWorkflow({ workflow: sampleWorkflow });
+
+  const builderPath = `/workflows/${sampleWorkflow.id}/builder`;
+  revalidatePath(builderPath);
+  redirect(builderPath);
+}
+
 export async function escalateRunAction(formData: FormData): Promise<void> {
   const runId = String(formData.get("runId") ?? "");
   if (!runId) {

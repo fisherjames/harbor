@@ -1,0 +1,434 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "id": "typed-trpc-contract-surface",
+      "name": "End-to-end typed tRPC contracts",
+      "phase": "phase-1",
+      "status": "complete",
+      "summary": "API, server caller, and UI surfaces share typed contracts without untyped request/response boundaries.",
+      "evidence": [
+        "packages/api/src/router.ts",
+        "packages/api/src/types.ts",
+        "apps/web/src/server/caller.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "export function createHarborRouter"
+        },
+        {
+          "path": "apps/web/src/server/caller.ts",
+          "pattern": "getAppRouter().createCaller(context)"
+        }
+      ]
+    },
+    {
+      "id": "staged-runtime-plan-execute-verify-fix",
+      "name": "Structured stage runtime",
+      "phase": "phase-1",
+      "status": "complete",
+      "summary": "Workflow execution follows plan -> execute -> verify -> fix with persisted stage artifacts and retries.",
+      "evidence": [
+        "packages/engine/src/runtime/runner.ts",
+        "packages/engine/test/runner-paths.test.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "const PROMPT_STAGES: RunStage[] = [\"plan\", \"execute\", \"verify\", \"fix\"]"
+        }
+      ]
+    },
+    {
+      "id": "harness-lint-remediation-loop",
+      "name": "Harness linter with remediation injection",
+      "phase": "phase-1",
+      "status": "complete",
+      "summary": "Critical findings block deploy; non-critical findings inject resolution steps and verifier checkpoints.",
+      "evidence": [
+        "packages/harness/src/linter.ts",
+        "packages/harness/src/prompt/assembler.ts",
+        "packages/api/src/router.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/harness/src/linter.ts",
+          "pattern": "const blocked = findings.some((finding) => finding.severity === \"critical\")"
+        },
+        {
+          "path": "packages/harness/src/prompt/assembler.ts",
+          "pattern": "## Harness Resolution Steps"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "runLintAtExecutionPoint(\"deploy\""
+        }
+      ]
+    },
+    {
+      "id": "memu-retrieval-writeback-policy",
+      "name": "memU retrieval and writeback policy",
+      "phase": "phase-1",
+      "status": "complete",
+      "summary": "memU policy is validated and enforced with retrieval on plan/verify and writeback on execute/fix.",
+      "evidence": [
+        "packages/memu/src/policy/validation.ts",
+        "packages/engine/src/runtime/runner.ts",
+        "packages/memu/test/policy.test.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/memu/src/policy/validation.ts",
+          "pattern": "retrievalMode: z.enum([\"monitor\", \"reason\"])"
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "if (stage !== \"plan\" && stage !== \"verify\")"
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "if (!policy?.writebackEnabled || (stage !== \"execute\" && stage !== \"fix\"))"
+        }
+      ]
+    },
+    {
+      "id": "workflow-builder-version-lifecycle",
+      "name": "Visual builder + version lifecycle",
+      "phase": "phase-2",
+      "status": "complete",
+      "summary": "React Flow builder supports typed nodes, draft/save/publish lifecycle, and version navigation.",
+      "evidence": [
+        "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
+        "apps/web/app/workflows/[workflowId]/builder/actions.ts",
+        "packages/database/src/repositories/workflow-registry.ts"
+      ],
+      "assertions": [
+        {
+          "path": "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
+          "pattern": "ReactFlow"
+        },
+        {
+          "path": "apps/web/app/workflows/[workflowId]/builder/workflow-builder.tsx",
+          "pattern": "saveAndPublishWorkflowAction"
+        }
+      ]
+    },
+    {
+      "id": "deploy-gates-eval-shadow-adversarial-github",
+      "name": "Deployment and promotion gates",
+      "phase": "phase-2",
+      "status": "complete",
+      "summary": "Deploy/publish gates evaluate lint, eval calibration, adversarial checks, shadow checks, and GitHub promotion checks.",
+      "evidence": [
+        "packages/api/src/router.ts",
+        "apps/web/src/server/github-promotion.ts",
+        "apps/web/test/github-promotion.test.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "runEvalGate"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "runAdversarialGate"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "runShadowGate"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "runPromotionChecks"
+        }
+      ]
+    },
+    {
+      "id": "policy-bundle-signing-provenance",
+      "name": "Policy bundle signing and provenance",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Signed policy bundles are verified before run/deploy and signatures are persisted as run artifacts.",
+      "evidence": [
+        "packages/engine/src/runtime/policy.ts",
+        "packages/engine/src/runtime/runner.ts",
+        "scripts/policy-bundle.mjs"
+      ],
+      "assertions": [
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "await dependencies.persistence.storeArtifact(runId, \"policy-signature\""
+        },
+        {
+          "path": "scripts/policy-bundle.mjs",
+          "pattern": "function verifyBundle(bundle, secret, trustedSignatures)"
+        }
+      ]
+    },
+    {
+      "id": "deterministic-replay-parity",
+      "name": "Deterministic replay manifest + taxonomy",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Runs persist replay manifests and divergence taxonomy; parity verification is available via script.",
+      "evidence": [
+        "packages/engine/src/runtime/runner.ts",
+        "scripts/replay-verify.mjs",
+        "apps/web/app/runs/[runId]/page.tsx"
+      ],
+      "assertions": [
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "\"replay-bundle-manifest\""
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "\"replay-divergence-taxonomy\""
+        },
+        {
+          "path": "scripts/replay-verify.mjs",
+          "pattern": "Usage: node ./scripts/replay-verify.mjs"
+        }
+      ]
+    },
+    {
+      "id": "confidence-gated-autonomy",
+      "name": "Confidence-gated escalation",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Low-confidence stage outputs escalate to needs_human with confidence artifacts.",
+      "evidence": [
+        "packages/engine/src/runtime/runner.ts",
+        "packages/engine/test/runner-paths.test.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "const DEFAULT_CONFIDENCE_GATE_STAGES: RunStage[] = [\"verify\"]"
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "\"confidence-gate\""
+        }
+      ]
+    },
+    {
+      "id": "two-phase-side-effect-enforcement",
+      "name": "Two-phase side-effect enforcement",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Mutating tool workflows require propose/commit ordering with validation artifacts.",
+      "evidence": [
+        "packages/harness/src/rules/core-rules.ts",
+        "packages/engine/src/runtime/runner.ts",
+        "packages/harness/test/linter.test.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/harness/src/rules/core-rules.ts",
+          "pattern": "sideEffectMode: z.enum([\"read\", \"propose\", \"commit\"])"
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "validateTwoPhaseSideEffects(workflow)"
+        },
+        {
+          "path": "packages/engine/src/runtime/runner.ts",
+          "pattern": "\"two-phase-validation\""
+        }
+      ]
+    },
+    {
+      "id": "evaluator-calibration-gate",
+      "name": "Evaluator calibration and drift gate",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Evaluator rubric drift is measured and blocks deploy/publish when thresholds are exceeded.",
+      "evidence": [
+        "packages/harness/src/evaluator.ts",
+        "scripts/evaluator-calibration-check.mjs",
+        "packages/api/src/router.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "calibration:"
+        },
+        {
+          "path": "scripts/evaluator-calibration-check.mjs",
+          "pattern": "Evaluator Calibration Check Summary"
+        }
+      ]
+    },
+    {
+      "id": "adversarial-smoke-nightly-taxonomy-gate",
+      "name": "Adversarial smoke/nightly taxonomy gate",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Adversarial suites run on deploy and nightly fixtures, producing taxonomy artifacts with critical blocking.",
+      "evidence": [
+        "packages/harness/src/adversarial.ts",
+        "scripts/adversarial-taxonomy-check.mjs",
+        "apps/worker/src/inngest.ts"
+      ],
+      "assertions": [
+        {
+          "path": "apps/worker/src/inngest.ts",
+          "pattern": "{ id: \"adversarial-nightly-scheduled\" }"
+        },
+        {
+          "path": "apps/worker/src/inngest.ts",
+          "pattern": "cron: \"0 3 * * *\""
+        },
+        {
+          "path": "scripts/adversarial-taxonomy-check.mjs",
+          "pattern": "Adversarial Taxonomy Check Summary"
+        }
+      ]
+    },
+    {
+      "id": "worktree-bound-run-isolation",
+      "name": "Worktree-bound run isolation",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Each run gets an isolated worktree plus deterministic teardown.",
+      "evidence": [
+        "apps/worker/src/run-isolation.ts",
+        "apps/worker/test/run-isolation.test.ts",
+        "docs/architecture/decision-records/0005-run-worktree-isolation.md"
+      ],
+      "assertions": [
+        {
+          "path": "apps/worker/src/run-isolation.ts",
+          "pattern": "const worktreeRoot ="
+        },
+        {
+          "path": "apps/worker/src/run-isolation.ts",
+          "pattern": "await rm(session.worktreePath, { recursive: true, force: true })"
+        }
+      ]
+    },
+    {
+      "id": "ephemeral-observability-envelope",
+      "name": "Per-run ephemeral observability",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Each run is assigned an observability session envelope with explicit expiry metadata.",
+      "evidence": [
+        "apps/worker/src/run-isolation.ts",
+        "packages/observability/src/index.ts",
+        "apps/web/app/runs/[runId]/page.tsx"
+      ],
+      "assertions": [
+        {
+          "path": "apps/worker/src/run-isolation.ts",
+          "pattern": "observabilitySessionId"
+        },
+        {
+          "path": "apps/worker/src/run-isolation.ts",
+          "pattern": "observabilityExpiresAt"
+        }
+      ]
+    },
+    {
+      "id": "memory-trust-conflict-metrics",
+      "name": "Memory trust/conflict metrics",
+      "phase": "phase-2.8",
+      "status": "complete",
+      "summary": "Memory trust/conflict artifacts are derived and surfaced on run detail views.",
+      "evidence": [
+        "packages/observability/src/index.ts",
+        "packages/engine/src/runtime/runner.ts",
+        "apps/web/app/runs/[runId]/page.tsx"
+      ],
+      "assertions": [
+        {
+          "path": "packages/observability/src/index.ts",
+          "pattern": "deriveMemoryTrustMetricsFromArtifacts"
+        },
+        {
+          "path": "apps/web/app/runs/[runId]/page.tsx",
+          "pattern": "Memory Trust + Conflict Metrics"
+        }
+      ]
+    },
+    {
+      "id": "stuck-run-detection-recovery",
+      "name": "Automatic stuck-run detection and recovery",
+      "phase": "phase-3",
+      "status": "complete",
+      "summary": "Scheduled detector scans stale running runs and escalates them with recovery artifacts.",
+      "evidence": [
+        "packages/database/src/repositories/run-store.ts",
+        "packages/database/src/repositories/postgres-run-persistence.ts",
+        "apps/worker/src/inngest.ts"
+      ],
+      "assertions": [
+        {
+          "path": "packages/database/src/repositories/run-store.ts",
+          "pattern": "listStuckRuns(input: ListStuckRunsInput): Promise<StuckRunCandidate[]>"
+        },
+        {
+          "path": "apps/worker/src/inngest.ts",
+          "pattern": "{ id: \"stuck-run-recovery-scheduled\" }"
+        },
+        {
+          "path": "apps/worker/src/inngest.ts",
+          "pattern": "\"stuck-run-recovery\""
+        }
+      ]
+    },
+    {
+      "id": "benchmark-to-production-bridge",
+      "name": "Benchmark-to-production bridge contract",
+      "phase": "phase-3",
+      "status": "complete",
+      "summary": "Deploy, publish, and promotion flows expose one typed bridge object that encodes lint/eval/promotion/adversarial/shadow progression and next action.",
+      "evidence": [
+        "packages/api/src/types.ts",
+        "packages/api/src/router.ts",
+        "packages/api/test/router.test.ts",
+        "docs/architecture/decision-records/0012-benchmark-to-production-bridge.md"
+      ],
+      "assertions": [
+        {
+          "path": "packages/api/src/types.ts",
+          "pattern": "export interface BenchmarkToProductionBridge"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "function createBenchmarkToProductionBridge"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "bridge: gates.bridge"
+        }
+      ]
+    },
+    {
+      "id": "machine-drift-gate-stack",
+      "name": "Machine + inference drift gate stack",
+      "phase": "phase-2.6",
+      "status": "complete",
+      "summary": "Vision/docs/legibility/standards/evaluator/adversarial machine checks and inference-assisted drift analysis are aggregated under root check.",
+      "evidence": [
+        "package.json",
+        "scripts/vision-drift-check.mjs",
+        "scripts/docs-drift-check.mjs",
+        "scripts/agent-legibility-check.mjs",
+        "scripts/standards-encoding-check.mjs",
+        "scripts/evaluator-calibration-check.mjs",
+        "scripts/adversarial-taxonomy-check.mjs",
+        "scripts/inference-check.mjs",
+        "docs/inference/reports/latest.json"
+      ],
+      "assertions": [
+        {
+          "path": "package.json",
+          "pattern": "\"check\": \"pnpm vision:check && pnpm docs:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check"
+        }
+      ]
+    }
+  ]
+}

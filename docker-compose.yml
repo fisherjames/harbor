@@ -1,5 +1,29 @@
 version: "3.9"
 
+x-harbor-common-env: &harbor-common-env
+  HARBOR_MODEL_PROVIDER: ${HARBOR_MODEL_PROVIDER:-openai}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  HARBOR_OPENAI_MODEL: ${HARBOR_OPENAI_MODEL:-gpt-4.1-mini}
+  HARBOR_OPENAI_BASE_URL: ${HARBOR_OPENAI_BASE_URL:-https://api.openai.com/v1}
+  HARBOR_OPENAI_TIMEOUT_MS: ${HARBOR_OPENAI_TIMEOUT_MS:-20000}
+  HARBOR_OPENAI_RETRIES: ${HARBOR_OPENAI_RETRIES:-2}
+  HARBOR_OPENAI_RETRY_JITTER_MS: ${HARBOR_OPENAI_RETRY_JITTER_MS:-120}
+  HARBOR_OPENAI_TEMPERATURE: ${HARBOR_OPENAI_TEMPERATURE:-0.2}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  GITHUB_PROMOTION_REPOSITORY: ${GITHUB_PROMOTION_REPOSITORY:-}
+  GITHUB_PROMOTION_BRANCH: ${GITHUB_PROMOTION_BRANCH:-}
+  GITHUB_PROMOTION_BASE_BRANCH: ${GITHUB_PROMOTION_BASE_BRANCH:-}
+  GITHUB_PROMOTION_SHA: ${GITHUB_PROMOTION_SHA:-}
+  GITHUB_PROMOTION_PR_NUMBER: ${GITHUB_PROMOTION_PR_NUMBER:-}
+  MEMU_ENDPOINT: ${MEMU_ENDPOINT:-http://memu-mock:8080}
+  MEMU_API_KEY: ${MEMU_API_KEY:-}
+  MEMU_SIGNING_SECRET: ${MEMU_SIGNING_SECRET:-}
+  DATABASE_URL: ${DATABASE_URL:-postgres://harbor:harbor@postgres:5432/harbor}
+  HARBOR_STUCK_RUN_STALE_AFTER_SECONDS: ${HARBOR_STUCK_RUN_STALE_AFTER_SECONDS:-900}
+  HARBOR_STUCK_RUN_SCAN_LIMIT: ${HARBOR_STUCK_RUN_SCAN_LIMIT:-100}
+  HARBOR_POLICY_SIGNING_SECRET: ${HARBOR_POLICY_SIGNING_SECRET:-}
+  HARBOR_TRUSTED_POLICY_SIGNATURES: ${HARBOR_TRUSTED_POLICY_SIGNATURES:-}
+
 services:
   postgres:
     image: postgres:16
@@ -9,30 +33,114 @@ services:
       POSTGRES_PASSWORD: harbor
       POSTGRES_DB: harbor
     ports:
-      - "5432:5432"
+      - "${HARBOR_POSTGRES_PORT:-5432}:5432"
     volumes:
       - harbor-postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U harbor -d harbor"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7
     container_name: harbor-redis
     ports:
-      - "6379:6379"
+      - "${HARBOR_REDIS_PORT:-6379}:6379"
     volumes:
       - harbor-redis-data:/data
-
-  inngest:
-    image: inngest/inngest:latest
-    container_name: harbor-inngest
-    command: "inngest dev -u http://host.docker.internal:3000/api/inngest"
-    ports:
-      - "8288:8288"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   memu-mock:
     image: wiremock/wiremock:latest
     container_name: harbor-memu-mock
     ports:
-      - "8081:8080"
+      - "${HARBOR_MEMU_PORT:-8081}:8080"
+    volumes:
+      - ./infra/memu-mock/mappings:/home/wiremock/mappings:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      target: runtime
+    container_name: harbor-worker
+    working_dir: /app
+    environment:
+      <<: *harbor-common-env
+      NODE_ENV: development
+      PORT: 8289
+      INNGEST_SERVE_PATH: /api/inngest
+      HARBOR_RUN_WORKTREE_ROOT: /tmp/harbor/runs
+      HARBOR_OBSERVABILITY_SESSION_TTL_MS: ${HARBOR_OBSERVABILITY_SESSION_TTL_MS:-900000}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-local-inline}
+    command: >-
+      sh -lc "pnpm build && pnpm --filter @harbor/worker start:inngest"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      memu-mock:
+        condition: service_healthy
+    ports:
+      - "${HARBOR_WORKER_PORT:-8289}:8289"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8289/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      target: runtime
+    container_name: harbor-web
+    working_dir: /app
+    environment:
+      <<: *harbor-common-env
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+    command: >-
+      sh -lc "pnpm build && pnpm --filter @harbor/web dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      memu-mock:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    ports:
+      - "${HARBOR_WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: harbor-inngest
+    command: "inngest dev -u http://worker:8289/api/inngest -p 8288"
+    depends_on:
+      worker:
+        condition: service_healthy
+    ports:
+      - "${HARBOR_INNGEST_PORT:-8288}:8288"
 
 volumes:
   harbor-postgres-data:
