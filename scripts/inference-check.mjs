@@ -102,7 +102,8 @@ async function backoff(attempt) {
 }
 
 async function runChatJson(input) {
-  const endpoint = new URL("/chat/completions", baseUrl);
+  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const endpoint = new URL("chat/completions", normalizedBaseUrl);
   let lastError = new Error("Inference request failed.");
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
