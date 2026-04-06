@@ -28,6 +28,7 @@ import type {
   OpenPromotionPullRequestOutput,
   PromotionPullRequestResult,
   PublishWorkflowVersionOutput,
+  CompareRunsOutput,
   ReplayRunOutput,
   RunDetail,
   RunSummary,
@@ -152,6 +153,11 @@ const listRunsInputSchema = z.object({
 
 const getRunInputSchema = z.object({
   runId: z.string().min(1)
+});
+
+const compareRunsInputSchema = z.object({
+  baseRunId: z.string().min(1),
+  candidateRunId: z.string().min(1)
 });
 
 const escalateRunInputSchema = z.object({
@@ -712,6 +718,107 @@ function verifyPolicyOrThrow(
   return verification;
 }
 
+function parseRunArtifactJson(value: string | undefined): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function resolveWorkflowVersion(run: RunDetail): number | undefined {
+  const detailsVersion = run.details?.["workflowVersion"];
+  if (typeof detailsVersion === "number" && Number.isFinite(detailsVersion)) {
+    return detailsVersion;
+  }
+
+  const manifest = parseRunArtifactJson(run.artifacts["replay-bundle-manifest"]);
+  const manifestVersion = manifest?.["workflowVersion"];
+  if (typeof manifestVersion === "number" && Number.isFinite(manifestVersion)) {
+    return manifestVersion;
+  }
+
+  return undefined;
+}
+
+function parseIsoMs(value: string): number {
+  const parsed = Date.parse(value);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  return 0;
+}
+
+function runArtifactDiff(base: RunDetail, candidate: RunDetail): CompareRunsOutput["artifactDiff"] {
+  const baseKeys = new Set(Object.keys(base.artifacts));
+  const candidateKeys = new Set(Object.keys(candidate.artifacts));
+
+  const added = [...candidateKeys].filter((key) => !baseKeys.has(key)).sort();
+  const removed = [...baseKeys].filter((key) => !candidateKeys.has(key)).sort();
+  const changed = [...candidateKeys]
+    .filter((key) => baseKeys.has(key) && candidate.artifacts[key] !== base.artifacts[key])
+    .sort();
+
+  return {
+    added,
+    removed,
+    changed
+  };
+}
+
+function runStageDiffs(base: RunDetail, candidate: RunDetail): CompareRunsOutput["stageDiffs"] {
+  const stageOrder: Array<"plan" | "execute" | "verify" | "fix"> = ["plan", "execute", "verify", "fix"];
+  const stageRank = new Map(stageOrder.map((stage, index) => [stage, index]));
+  const stageSortRank = (stage: "plan" | "execute" | "verify" | "fix"): number => {
+    const rank = stageRank.get(stage);
+    if (typeof rank === "number") {
+      return rank;
+    }
+
+    return Number.MAX_SAFE_INTEGER;
+  };
+  const stageSet = new Set<"plan" | "execute" | "verify" | "fix">();
+
+  for (const stage of base.stages) {
+    stageSet.add(stage.stage);
+  }
+  for (const stage of candidate.stages) {
+    stageSet.add(stage.stage);
+  }
+
+  return [...stageSet]
+    .sort((a, b) => stageSortRank(a) - stageSortRank(b))
+    .map((stage) => {
+      const baseStage = base.stages.find((entry) => entry.stage === stage);
+      const candidateStage = candidate.stages.find((entry) => entry.stage === stage);
+      const baseTokens = baseStage?.tokenUsage?.totalTokens ?? 0;
+      const candidateTokens = candidateStage?.tokenUsage?.totalTokens ?? 0;
+
+      return {
+        stage,
+        presentInBase: Boolean(baseStage),
+        presentInCandidate: Boolean(candidateStage),
+        baseAttempts: baseStage?.attempts ?? 0,
+        candidateAttempts: candidateStage?.attempts ?? 0,
+        ...(typeof baseStage?.confidence === "number" ? { baseConfidence: baseStage.confidence } : {}),
+        ...(typeof candidateStage?.confidence === "number" ? { candidateConfidence: candidateStage.confidence } : {}),
+        promptChanged: Boolean(baseStage && candidateStage && baseStage.prompt !== candidateStage.prompt),
+        outputChanged: Boolean(baseStage && candidateStage && baseStage.output !== candidateStage.output),
+        totalTokenDelta: candidateTokens - baseTokens
+      };
+    });
+}
+
 export function createHarborRouter(dependencies: HarborApiDependencies) {
   return t.router({
     saveWorkflow: authzProcedure.input(saveInputSchema).mutation(({ input }) => {
@@ -1028,6 +1135,60 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
       }
 
       return run;
+    }),
+
+    compareRuns: authzProcedure.input(compareRunsInputSchema).query(async ({ ctx, input }): Promise<CompareRunsOutput> => {
+      const baseRun = await dependencies.getRun(ctx, input.baseRunId);
+      if (!baseRun) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Base run not found"
+        });
+      }
+
+      const candidateRun =
+        input.candidateRunId === input.baseRunId ? baseRun : await dependencies.getRun(ctx, input.candidateRunId);
+      if (!candidateRun) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Candidate run not found"
+        });
+      }
+
+      const baseVersion = resolveWorkflowVersion(baseRun);
+      const candidateVersion = resolveWorkflowVersion(candidateRun);
+
+      return {
+        baseRunId: baseRun.runId,
+        candidateRunId: candidateRun.runId,
+        baseWorkflowId: baseRun.workflowId,
+        candidateWorkflowId: candidateRun.workflowId,
+        sameWorkflow: baseRun.workflowId === candidateRun.workflowId,
+        ...(typeof baseVersion === "number" ? { baseWorkflowVersion: baseVersion } : {}),
+        ...(typeof candidateVersion === "number" ? { candidateWorkflowVersion: candidateVersion } : {}),
+        ...(typeof baseVersion === "number" && typeof candidateVersion === "number"
+          ? {
+              workflowVersionDelta: candidateVersion - baseVersion
+            }
+          : {}),
+        baseStatus: baseRun.status,
+        candidateStatus: candidateRun.status,
+        statusChanged: baseRun.status !== candidateRun.status,
+        tokenDelta: {
+          inputTokens: candidateRun.tokenUsage.inputTokens - baseRun.tokenUsage.inputTokens,
+          outputTokens: candidateRun.tokenUsage.outputTokens - baseRun.tokenUsage.outputTokens,
+          totalTokens: candidateRun.tokenUsage.totalTokens - baseRun.tokenUsage.totalTokens,
+          estimatedCostUsd: Number(
+            (candidateRun.tokenUsage.estimatedCostUsd - baseRun.tokenUsage.estimatedCostUsd).toFixed(6)
+          )
+        },
+        createdAtDeltaSeconds: Math.round((parseIsoMs(candidateRun.createdAt) - parseIsoMs(baseRun.createdAt)) / 1000),
+        updatedAtDeltaSeconds: Math.round((parseIsoMs(candidateRun.updatedAt) - parseIsoMs(baseRun.updatedAt)) / 1000),
+        outputChanged: JSON.stringify(candidateRun.output ?? null) !== JSON.stringify(baseRun.output ?? null),
+        lintFindingDelta: candidateRun.lintFindings.length - baseRun.lintFindings.length,
+        stageDiffs: runStageDiffs(baseRun, candidateRun),
+        artifactDiff: runArtifactDiff(baseRun, candidateRun)
+      };
     }),
 
     escalateRun: authzProcedure.input(escalateRunInputSchema).mutation(async ({ ctx, input }) => {

@@ -22,6 +22,8 @@ Harden Harbor for operational reliability, production observability, and tenancy
 9. Added a typed benchmark-to-production bridge contract so deploy/publish/promotion flows return one unified harness progression path (lint → eval → promotion → adversarial → shadow) with explicit next action.
 10. Added Stream B reliability observability surfaces: run-health facets, per-workflow P95/failure taxonomy summaries, and typed reliability budget alert hook payload rendering on the home dashboard.
 11. Added full branch coverage tests for Stream B observability contracts in `@harbor/observability`.
+12. Added Stream C operator UX surfaces: version-aware run compare, guided onboarding template run path, and memory explorer snapshot over recent run artifacts.
+13. Added typed `compareRuns` API contract with full branch coverage and UI integration on run detail pages.
 
 ## Streams
 
@@ -54,9 +56,9 @@ Definition of done:
 Owner: `apps/web` + `packages/api`
 
 Tasks:
-1. Add run diffing and version-aware compare surfaces.
-2. Add guided onboarding templates with harness-safe defaults.
-3. Expose memory explorer conflict and trust views from existing artifacts.
+1. Completed: run diffing and version-aware compare surfaces.
+2. Completed: guided onboarding template with harness-safe defaults and one-click run path.
+3. Completed: memory explorer conflict/trust snapshot over recent run artifacts.
 
 Definition of done:
 1. New users can run a template workflow in one guided path.

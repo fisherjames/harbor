@@ -6,6 +6,55 @@ import { redirect } from "next/navigation";
 import { createServerCaller } from "@/src/server/caller";
 import { sampleWorkflow } from "@/src/lib/sample-workflow";
 
+function onboardingTemplateWorkflow() {
+  return {
+    ...sampleWorkflow,
+    id: "wf_onboarding",
+    name: "Onboarding starter workflow",
+    version: 1,
+    objective:
+      "Guide first-time operators through Harbor plan/execute/verify/fix lifecycle with explicit acceptance checks.",
+    systemPrompt:
+      "You are Harbor onboarding assistant. Follow harness constraints, keep actions tenant-scoped, and produce operator-ready outputs.",
+    memoryPolicy: {
+      retrievalMode: "monitor" as const,
+      maxContextItems: 8,
+      writebackEnabled: true,
+      piiRetention: "redacted" as const
+    },
+    nodes: [
+      {
+        id: "plan",
+        type: "planner" as const,
+        owner: "onboarding",
+        timeoutMs: 2_000,
+        retryLimit: 1
+      },
+      {
+        id: "execute",
+        type: "executor" as const,
+        owner: "onboarding",
+        timeoutMs: 2_000,
+        retryLimit: 1
+      },
+      {
+        id: "verify",
+        type: "verifier" as const,
+        owner: "onboarding",
+        timeoutMs: 2_000,
+        retryLimit: 1
+      },
+      {
+        id: "fix",
+        type: "executor" as const,
+        owner: "onboarding",
+        timeoutMs: 2_000,
+        retryLimit: 1
+      }
+    ]
+  };
+}
+
 export async function runSampleWorkflowAction(formData: FormData): Promise<void> {
   const requestHeaders = await headers();
   const caller = await createServerCaller({ headers: requestHeaders });
@@ -34,6 +83,30 @@ export async function openWorkflowBuilderAction(): Promise<void> {
   const builderPath = `/workflows/${sampleWorkflow.id}/builder`;
   revalidatePath(builderPath);
   redirect(builderPath);
+}
+
+export async function runOnboardingTemplateAction(): Promise<void> {
+  const requestHeaders = await headers();
+  const caller = await createServerCaller({ headers: requestHeaders });
+  const workflow = onboardingTemplateWorkflow();
+
+  await caller.saveWorkflowVersion({
+    workflow,
+    state: "draft"
+  });
+
+  const run = await caller.runWorkflow({
+    workflow,
+    trigger: "manual",
+    input: {
+      prompt: "Run the Harbor onboarding template and produce a concise operator handoff summary."
+    }
+  });
+
+  revalidatePath("/");
+  revalidatePath(`/runs/${run.runId}`);
+  revalidatePath(`/workflows/${workflow.id}/builder`);
+  redirect(`/runs/${run.runId}?source=onboarding-template`);
 }
 
 export async function escalateRunAction(formData: FormData): Promise<void> {

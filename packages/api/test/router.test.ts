@@ -1617,6 +1617,373 @@ describe("createHarborRouter", () => {
     expect(run.tokenUsage.totalTokens).toBe(15);
   });
 
+  it("returns version-aware run comparison with stage and artifact deltas", async () => {
+    const baseRun = {
+      runId: "run_base",
+      workflowId: "wf_1",
+      status: "completed" as const,
+      trigger: "manual" as const,
+      actorId: "user_1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:01:00.000Z",
+      tokenUsage: {
+        inputTokens: 100,
+        outputTokens: 40,
+        totalTokens: 140,
+        estimatedCostUsd: 0.004
+      },
+      input: { prompt: "base prompt" },
+      output: { summary: "base output" },
+      details: { workflowVersion: 1 },
+      lintFindings: [{ findingId: "f1", ruleId: "HAR001", severity: "warning", message: "base finding", resolutionSteps: [] }],
+      stages: [
+        {
+          stage: "plan" as const,
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:10.000Z",
+          prompt: "plan prompt base",
+          output: "plan output base",
+          attempts: 1,
+          confidence: 0.8,
+          tokenUsage: {
+            inputTokens: 20,
+            outputTokens: 10,
+            totalTokens: 30
+          },
+          lintFindings: []
+        },
+        {
+          stage: "execute" as const,
+          startedAt: "2026-01-01T00:00:11.000Z",
+          completedAt: "2026-01-01T00:00:40.000Z",
+          prompt: "execute prompt base",
+          output: "execute output base",
+          attempts: 1,
+          tokenUsage: {
+            inputTokens: 30,
+            outputTokens: 20,
+            totalTokens: 50
+          },
+          lintFindings: []
+        }
+      ],
+      artifacts: {
+        "replay-bundle-manifest": JSON.stringify({ workflowVersion: 1 }),
+        "artifact-keep": "same",
+        "artifact-change": "old"
+      }
+    };
+
+    const candidateRun = {
+      ...baseRun,
+      runId: "run_candidate",
+      status: "needs_human" as const,
+      createdAt: "2026-01-01T00:02:00.000Z",
+      updatedAt: "2026-01-01T00:03:00.000Z",
+      tokenUsage: {
+        inputTokens: 120,
+        outputTokens: 65,
+        totalTokens: 185,
+        estimatedCostUsd: 0.0054
+      },
+      output: { summary: "candidate output" },
+      details: {},
+      lintFindings: [
+        { findingId: "f1", ruleId: "HAR001", severity: "warning", message: "candidate finding", resolutionSteps: [] },
+        { findingId: "f2", ruleId: "HAR004", severity: "critical", message: "critical finding", resolutionSteps: [] }
+      ],
+      stages: [
+        {
+          ...baseRun.stages[0],
+          prompt: "plan prompt candidate",
+          output: "plan output candidate",
+          attempts: 2,
+          confidence: 0.9,
+          tokenUsage: {
+            inputTokens: 35,
+            outputTokens: 20,
+            totalTokens: 55
+          }
+        },
+        {
+          stage: "verify" as const,
+          startedAt: "2026-01-01T00:02:20.000Z",
+          completedAt: "2026-01-01T00:02:40.000Z",
+          prompt: "verify prompt candidate",
+          output: "verify output candidate",
+          attempts: 1,
+          tokenUsage: {
+            inputTokens: 15,
+            outputTokens: 5,
+            totalTokens: 20
+          },
+          lintFindings: []
+        }
+      ],
+      artifacts: {
+        "replay-bundle-manifest": JSON.stringify({ workflowVersion: 2 }),
+        "artifact-keep": "same",
+        "artifact-change": "new",
+        "artifact-add": "new-only"
+      }
+    };
+
+    const router = createRouter({
+      async getRun(_context, runId) {
+        if (runId === "run_base") {
+          return baseRun;
+        }
+
+        if (runId === "run_candidate") {
+          return candidateRun;
+        }
+
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.compareRuns({
+      baseRunId: "run_base",
+      candidateRunId: "run_candidate"
+    });
+
+    expect(result.sameWorkflow).toBe(true);
+    expect(result.baseWorkflowVersion).toBe(1);
+    expect(result.candidateWorkflowVersion).toBe(2);
+    expect(result.workflowVersionDelta).toBe(1);
+    expect(result.statusChanged).toBe(true);
+    expect(result.tokenDelta.totalTokens).toBe(45);
+    expect(result.tokenDelta.estimatedCostUsd).toBe(0.0014);
+    expect(result.createdAtDeltaSeconds).toBe(120);
+    expect(result.updatedAtDeltaSeconds).toBe(120);
+    expect(result.outputChanged).toBe(true);
+    expect(result.lintFindingDelta).toBe(1);
+    expect(result.artifactDiff.added).toEqual(["artifact-add"]);
+    expect(result.artifactDiff.removed).toEqual([]);
+    expect(result.artifactDiff.changed).toEqual(["artifact-change", "replay-bundle-manifest"]);
+    expect(result.stageDiffs).toEqual([
+      {
+        stage: "plan",
+        presentInBase: true,
+        presentInCandidate: true,
+        baseAttempts: 1,
+        candidateAttempts: 2,
+        baseConfidence: 0.8,
+        candidateConfidence: 0.9,
+        promptChanged: true,
+        outputChanged: true,
+        totalTokenDelta: 25
+      },
+      {
+        stage: "execute",
+        presentInBase: true,
+        presentInCandidate: false,
+        baseAttempts: 1,
+        candidateAttempts: 0,
+        promptChanged: false,
+        outputChanged: false,
+        totalTokenDelta: -50
+      },
+      {
+        stage: "verify",
+        presentInBase: false,
+        presentInCandidate: true,
+        baseAttempts: 0,
+        candidateAttempts: 1,
+        promptChanged: false,
+        outputChanged: false,
+        totalTokenDelta: 20
+      }
+    ]);
+  });
+
+  it("compares the same run id without requiring a second fetch", async () => {
+    let fetches = 0;
+    const router = createRouter({
+      async getRun() {
+        fetches += 1;
+        return {
+          runId: "run_1",
+          workflowId: "wf_1",
+          status: "completed",
+          trigger: "manual",
+          actorId: "user_1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          tokenUsage: {
+            inputTokens: 1,
+            outputTokens: 1,
+            totalTokens: 2,
+            estimatedCostUsd: 0.000002
+          },
+          input: { prompt: "same" },
+          output: { summary: "same" },
+          details: {},
+          lintFindings: [],
+          stages: [],
+          artifacts: {
+            "replay-bundle-manifest": "{invalid-json"
+          }
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.compareRuns({
+      baseRunId: "run_1",
+      candidateRunId: "run_1"
+    });
+
+    expect(fetches).toBe(1);
+    expect(result.sameWorkflow).toBe(true);
+    expect(result.statusChanged).toBe(false);
+    expect(result.tokenDelta.totalTokens).toBe(0);
+    expect(result.stageDiffs).toEqual([]);
+    expect(result.artifactDiff.changed).toEqual([]);
+    expect(result.baseWorkflowVersion).toBeUndefined();
+    expect(result.candidateWorkflowVersion).toBeUndefined();
+    expect(result.workflowVersionDelta).toBeUndefined();
+  });
+
+  it("returns not found errors when compareRuns run ids are missing", async () => {
+    const router = createRouter({
+      async getRun(_context, runId) {
+        if (runId === "run_base") {
+          return {
+            runId: "run_base",
+            workflowId: "wf_1",
+            status: "completed",
+            trigger: "manual",
+            actorId: "user_1",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            tokenUsage: {
+              inputTokens: 1,
+              outputTokens: 1,
+              totalTokens: 2,
+              estimatedCostUsd: 0.000002
+            },
+            input: {},
+            lintFindings: [],
+            stages: [],
+            artifacts: {}
+          };
+        }
+
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.compareRuns({
+        baseRunId: "missing",
+        candidateRunId: "run_base"
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Base run not found"
+    });
+
+    await expect(
+      caller.compareRuns({
+        baseRunId: "run_base",
+        candidateRunId: "missing"
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Candidate run not found"
+    });
+  });
+
+  it("handles missing/non-object replay manifests and invalid timestamps in compareRuns", async () => {
+    const router = createRouter({
+      async getRun(_context, runId) {
+        if (runId === "run_base") {
+          return {
+            runId: "run_base",
+            workflowId: "wf_1",
+            status: "completed",
+            trigger: "manual",
+            actorId: "user_1",
+            createdAt: "invalid-base-created-at",
+            updatedAt: "invalid-base-updated-at",
+            tokenUsage: {
+              inputTokens: 10,
+              outputTokens: 5,
+              totalTokens: 15,
+              estimatedCostUsd: 0.00015
+            },
+            input: {},
+            lintFindings: [],
+            stages: [
+              {
+                stage: "plan",
+                startedAt: "2026-01-01T00:00:00.000Z",
+                completedAt: "2026-01-01T00:00:01.000Z",
+                prompt: "base plan",
+                output: "base plan output",
+                attempts: 1,
+                lintFindings: []
+              }
+            ],
+            artifacts: {}
+          };
+        }
+
+        if (runId === "run_candidate") {
+          return {
+            runId: "run_candidate",
+            workflowId: "wf_2",
+            status: "failed",
+            trigger: "manual",
+            actorId: "user_1",
+            createdAt: "invalid-candidate-created-at",
+            updatedAt: "invalid-candidate-updated-at",
+            tokenUsage: {
+              inputTokens: 12,
+              outputTokens: 6,
+              totalTokens: 18,
+              estimatedCostUsd: 0.00018
+            },
+            input: {},
+            lintFindings: [],
+            stages: [
+              {
+                stage: "custom" as unknown as "plan",
+                startedAt: "2026-01-01T00:00:02.000Z",
+                completedAt: "2026-01-01T00:00:03.000Z",
+                prompt: "candidate custom",
+                output: "candidate custom output",
+                attempts: 1,
+                lintFindings: []
+              }
+            ],
+            artifacts: {
+              "replay-bundle-manifest": "[]"
+            }
+          };
+        }
+
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.compareRuns({
+      baseRunId: "run_base",
+      candidateRunId: "run_candidate"
+    });
+
+    expect(result.sameWorkflow).toBe(false);
+    expect(result.baseWorkflowVersion).toBeUndefined();
+    expect(result.candidateWorkflowVersion).toBeUndefined();
+    expect(result.workflowVersionDelta).toBeUndefined();
+    expect(result.createdAtDeltaSeconds).toBe(0);
+    expect(result.updatedAtDeltaSeconds).toBe(0);
+  });
+
   it("escalates a run and applies default reason when omitted", async () => {
     const calls: Array<{ runId: string; reason?: string | undefined }> = [];
     const router = createRouter({

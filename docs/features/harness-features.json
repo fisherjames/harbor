@@ -433,6 +433,51 @@
       ]
     },
     {
+      "id": "phase3-run-compare-onboarding-memory-explorer",
+      "name": "Phase 3 run compare, onboarding path, and memory explorer",
+      "phase": "phase-3",
+      "status": "complete",
+      "summary": "Operators can compare runs version-to-version, new users can run onboarding template workflows in one guided path, and dashboard memory explorer snapshots expose conflict/trust signals.",
+      "evidence": [
+        "packages/api/src/types.ts",
+        "packages/api/src/router.ts",
+        "packages/api/test/router.test.ts",
+        "apps/web/app/actions.ts",
+        "apps/web/app/page.tsx",
+        "apps/web/app/runs/[runId]/page.tsx"
+      ],
+      "assertions": [
+        {
+          "path": "packages/api/src/types.ts",
+          "pattern": "export interface CompareRunsOutput"
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "compareRuns: authzProcedure.input(compareRunsInputSchema)"
+        },
+        {
+          "path": "packages/api/test/router.test.ts",
+          "pattern": "returns version-aware run comparison with stage and artifact deltas"
+        },
+        {
+          "path": "apps/web/app/actions.ts",
+          "pattern": "runOnboardingTemplateAction"
+        },
+        {
+          "path": "apps/web/app/page.tsx",
+          "pattern": "Guided Onboarding"
+        },
+        {
+          "path": "apps/web/app/page.tsx",
+          "pattern": "Memory Explorer Snapshot"
+        },
+        {
+          "path": "apps/web/app/runs/[runId]/page.tsx",
+          "pattern": "Version-aware Run Compare"
+        }
+      ]
+    },
+    {
       "id": "benchmark-to-production-bridge",
       "name": "Benchmark-to-production bridge contract",
       "phase": "phase-3",

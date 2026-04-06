@@ -199,6 +199,51 @@ export interface ReplayRunOutput extends WorkflowRunResult {
   replayReason: string;
 }
 
+export interface CompareRunsInput {
+  baseRunId: string;
+  candidateRunId: string;
+}
+
+export interface RunArtifactDiff {
+  added: string[];
+  removed: string[];
+  changed: string[];
+}
+
+export interface RunStageDiff {
+  stage: StageExecutionRecord["stage"];
+  presentInBase: boolean;
+  presentInCandidate: boolean;
+  baseAttempts: number;
+  candidateAttempts: number;
+  baseConfidence?: number | undefined;
+  candidateConfidence?: number | undefined;
+  promptChanged: boolean;
+  outputChanged: boolean;
+  totalTokenDelta: number;
+}
+
+export interface CompareRunsOutput {
+  baseRunId: string;
+  candidateRunId: string;
+  baseWorkflowId: string;
+  candidateWorkflowId: string;
+  sameWorkflow: boolean;
+  baseWorkflowVersion?: number | undefined;
+  candidateWorkflowVersion?: number | undefined;
+  workflowVersionDelta?: number | undefined;
+  baseStatus: RunStatus;
+  candidateStatus: RunStatus;
+  statusChanged: boolean;
+  tokenDelta: RunTokenUsage;
+  createdAtDeltaSeconds: number;
+  updatedAtDeltaSeconds: number;
+  outputChanged: boolean;
+  lintFindingDelta: number;
+  stageDiffs: RunStageDiff[];
+  artifactDiff: RunArtifactDiff;
+}
+
 export type WorkflowVersionState = "draft" | "published";
 
 export interface WorkflowVersionSummary {

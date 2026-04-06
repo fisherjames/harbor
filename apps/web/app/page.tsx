@@ -2,10 +2,11 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
 import { sampleWorkflow } from "@/src/lib/sample-workflow";
-import { openWorkflowBuilderAction, runSampleWorkflowAction } from "./actions";
+import { openWorkflowBuilderAction, runOnboardingTemplateAction, runSampleWorkflowAction } from "./actions";
 import type { RunDetail, RunSummary } from "@harbor/api";
 import {
   createReliabilityAlertHookPayload,
+  deriveMemoryTrustMetricsFromArtifacts,
   deriveRunHealthFacets,
   deriveWorkflowReliabilitySummaries
 } from "@harbor/observability";
@@ -49,11 +50,30 @@ export default async function HomePage() {
   });
   const workflowReliabilitySummaries = deriveWorkflowReliabilitySummaries(runHealthObservations);
   const reliabilityAlertHookPayload = createReliabilityAlertHookPayload(workflowReliabilitySummaries);
+  const memoryExplorerRows = runDetails.map((run) => {
+    const metrics = deriveMemoryTrustMetricsFromArtifacts(run.artifacts);
+    return {
+      runId: run.runId,
+      workflowId: run.workflowId,
+      memoryReads: metrics.memoryReadCount,
+      conflictRate: metrics.conflictRate,
+      droppedMemoryCount: metrics.latestDroppedMemoryCount
+    };
+  });
 
   return (
     <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system", maxWidth: 1100 }}>
       <h1>Harbor</h1>
       <p>Harness-first agent orchestration platform</p>
+      <section style={{ marginTop: 12, border: "1px solid #dbe3ef", borderRadius: 12, padding: 14 }}>
+        <h2>Guided Onboarding</h2>
+        <p>Run a harness-safe starter template end-to-end in one click.</p>
+        <form action={runOnboardingTemplateAction}>
+          <button type="submit" style={{ padding: "8px 14px" }}>
+            Run Onboarding Template
+          </button>
+        </form>
+      </section>
       <section>
         <h2>Typed tRPC Save Result</h2>
         <p>Workflow: {saveResult.workflowId}</p>
@@ -205,6 +225,43 @@ export default async function HomePage() {
             {JSON.stringify(reliabilityAlertHookPayload, null, 2)}
           </pre>
         </details>
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h2>Memory Explorer Snapshot</h2>
+        {memoryExplorerRows.length === 0 ? (
+          <p>No memory activity captured yet.</p>
+        ) : (
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>Run</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>Workflow</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Memory reads
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Conflict rate
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Dropped memory
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {memoryExplorerRows.map((row) => (
+                <tr key={row.runId}>
+                  <td style={{ padding: "8px 4px" }}>
+                    <Link href={`/runs/${row.runId}`}>{row.runId}</Link>
+                  </td>
+                  <td style={{ padding: "8px 4px" }}>{row.workflowId}</td>
+                  <td style={{ padding: "8px 4px" }}>{row.memoryReads}</td>
+                  <td style={{ padding: "8px 4px" }}>{row.conflictRate}</td>
+                  <td style={{ padding: "8px 4px" }}>{row.droppedMemoryCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </main>
   );

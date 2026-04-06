@@ -3,11 +3,13 @@ import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
 import { escalateRunAction, replayRunAction } from "../../actions";
 import { deriveMemoryTrustMetricsFromArtifacts } from "@harbor/observability";
+import type { CompareRunsOutput, RunSummary } from "@harbor/api";
 
 interface RunDetailPageProps {
   params: Promise<{
     runId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 function parseJsonArtifact<T>(value: string | undefined): T | null {
@@ -22,8 +24,21 @@ function parseJsonArtifact<T>(value: string | undefined): T | null {
   }
 }
 
-export default async function RunDetailPage({ params }: RunDetailPageProps) {
+function queryValue(value: string | string[] | undefined): string | null {
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].length > 0) {
+    return value[0];
+  }
+
+  return null;
+}
+
+export default async function RunDetailPage({ params, searchParams }: RunDetailPageProps) {
   const { runId } = await params;
+  const query = await searchParams;
   const requestHeaders = await headers();
   const caller = await createServerCaller({ headers: requestHeaders });
   const run = await caller.getRun({ runId });
@@ -59,6 +74,22 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
       : "divergence_detected"
     : "missing_replay_manifest";
   const memoryTrustMetrics = deriveMemoryTrustMetricsFromArtifacts(run.artifacts);
+  const compareRunId = queryValue(query.compareRunId);
+  const comparableRuns = ((await caller.listRuns({ workflowId: run.workflowId, limit: 40 })) as RunSummary[]).filter(
+    (entry) => entry.runId !== run.runId
+  );
+  let runComparison: CompareRunsOutput | null = null;
+  let runComparisonError: string | null = null;
+  if (compareRunId && compareRunId !== run.runId) {
+    try {
+      runComparison = await caller.compareRuns({
+        baseRunId: run.runId,
+        candidateRunId: compareRunId
+      });
+    } catch (error) {
+      runComparisonError = error instanceof Error ? error.message : "Failed to compare runs.";
+    }
+  }
 
   return (
     <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system", maxWidth: 1100 }}>
@@ -134,6 +165,76 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             </code>
           </p>
         ) : null}
+      </section>
+      <section style={{ marginTop: 20 }}>
+        <h2>Version-aware Run Compare</h2>
+        <form method="get" action={`/runs/${run.runId}`} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select name="compareRunId" defaultValue={compareRunId ?? ""} style={{ minWidth: 280, padding: 8 }}>
+            <option value="">Select run to compare</option>
+            {comparableRuns.map((candidate) => (
+              <option key={candidate.runId} value={candidate.runId}>
+                {candidate.runId} | {candidate.status} | {new Date(candidate.updatedAt).toLocaleString()}
+              </option>
+            ))}
+          </select>
+          <button type="submit" style={{ padding: "8px 14px" }}>
+            Compare
+          </button>
+        </form>
+        {runComparisonError ? <p style={{ color: "#b91c1c" }}>{runComparisonError}</p> : null}
+        {runComparison ? (
+          <div style={{ marginTop: 10 }}>
+            <p>
+              Base status: <strong>{runComparison.baseStatus}</strong> | Candidate status:{" "}
+              <strong>{runComparison.candidateStatus}</strong> | Status changed:{" "}
+              <strong>{String(runComparison.statusChanged)}</strong>
+            </p>
+            <p>
+              Workflow versions: {runComparison.baseWorkflowVersion ?? "n/a"} →{" "}
+              {runComparison.candidateWorkflowVersion ?? "n/a"} | Delta: {runComparison.workflowVersionDelta ?? 0}
+            </p>
+            <p>
+              Token delta: {runComparison.tokenDelta.totalTokens} | Cost delta: $
+              {runComparison.tokenDelta.estimatedCostUsd.toFixed(6)}
+            </p>
+            <p>
+              Artifact diff: +{runComparison.artifactDiff.added.length} / -{runComparison.artifactDiff.removed.length} / ~
+              {runComparison.artifactDiff.changed.length}
+            </p>
+            <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 4px" }}>Stage</th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 4px" }}>Attempts</th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 4px" }}>
+                    Prompt changed
+                  </th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 4px" }}>
+                    Output changed
+                  </th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 4px" }}>
+                    Token delta
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {runComparison.stageDiffs.map((diff) => (
+                  <tr key={diff.stage}>
+                    <td style={{ padding: "6px 4px" }}>{diff.stage}</td>
+                    <td style={{ padding: "6px 4px" }}>
+                      {diff.baseAttempts} → {diff.candidateAttempts}
+                    </td>
+                    <td style={{ padding: "6px 4px" }}>{String(diff.promptChanged)}</td>
+                    <td style={{ padding: "6px 4px" }}>{String(diff.outputChanged)}</td>
+                    <td style={{ padding: "6px 4px" }}>{diff.totalTokenDelta}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p style={{ marginTop: 8 }}>Select a run to compare behavior and costs across versions.</p>
+        )}
       </section>
       <section style={{ marginTop: 20 }}>
         <h2>Stage Timeline + Logs</h2>
