@@ -28,6 +28,7 @@ import type {
   OpenPromotionPullRequestOutput,
   PromotionPullRequestResult,
   PublishWorkflowVersionOutput,
+  ReplayRunOutput,
   RunDetail,
   RunSummary,
   SaveWorkflowVersionOutput,
@@ -158,6 +159,14 @@ const escalateRunInputSchema = z.object({
   reason: z.string().trim().min(1).max(300).optional()
 });
 
+const replayRunInputSchema = z.object({
+  sourceRunId: z.string().min(1),
+  workflow: workflowSchema,
+  replayReason: z.string().trim().min(1).max(300).optional(),
+  trigger: z.enum(["manual", "api"]).default("manual"),
+  idempotencyKey: z.string().trim().min(1).max(128).optional()
+});
+
 export interface HarborApiDependencies {
   runWorkflow(request: WorkflowRunRequest, workflow: WorkflowDefinition): Promise<WorkflowRunResult>;
   listRuns(context: HarborApiContext, input: ListRunsInput): Promise<RunSummary[]>;
@@ -207,6 +216,15 @@ export interface HarborApiDependencies {
   runPromotionChecks?(context: HarborApiContext, input: PromotionGateInput): Promise<PromotionGateSummary>;
   runAdversarialGate?(context: HarborApiContext, input: AdversarialGateInput): Promise<AdversarialGateSummary>;
   runShadowGate?(context: HarborApiContext, input: ShadowGateInput): Promise<ShadowGateSummary>;
+  linkReplayRuns?(
+    context: HarborApiContext,
+    input: {
+      sourceRunId: string;
+      replayRunId: string;
+      workflowId: string;
+      reason: string;
+    }
+  ): Promise<void>;
   policyVerifier?: WorkflowPolicyVerifier | undefined;
 }
 
@@ -951,6 +969,49 @@ export function createHarborRouter(dependencies: HarborApiDependencies) {
       };
 
       return dependencies.runWorkflow(runRequest, input.workflow);
+    }),
+
+    replayRun: authzProcedure.input(replayRunInputSchema).mutation(async ({ ctx, input }): Promise<ReplayRunOutput> => {
+      verifyPolicyOrThrow(dependencies.policyVerifier, input.workflow, "run");
+
+      const sourceRun = await dependencies.getRun(ctx, input.sourceRunId);
+      if (!sourceRun) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source run not found"
+        });
+      }
+
+      const replayReason = input.replayReason ?? "Recovery replay requested by operator.";
+      const replayIdempotencyKey = input.idempotencyKey ?? `replay:${sourceRun.runId}:${input.workflow.version}`;
+
+      const runRequest: WorkflowRunRequest = {
+        tenantId: ctx.tenantId,
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        workflowId: input.workflow.id,
+        trigger: input.trigger,
+        input: sourceRun.input,
+        idempotencyKey: replayIdempotencyKey
+      };
+
+      const replayResult = await dependencies.runWorkflow(runRequest, input.workflow);
+
+      if (dependencies.linkReplayRuns) {
+        await dependencies.linkReplayRuns(ctx, {
+          sourceRunId: sourceRun.runId,
+          replayRunId: replayResult.runId,
+          workflowId: input.workflow.id,
+          reason: replayReason
+        });
+      }
+
+      return {
+        ...replayResult,
+        sourceRunId: sourceRun.runId,
+        sourceWorkflowId: sourceRun.workflowId,
+        replayReason
+      };
     }),
 
     listRuns: authzProcedure.input(listRunsInputSchema).query(async ({ ctx, input }) => {

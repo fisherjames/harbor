@@ -54,3 +54,32 @@ export async function escalateRunAction(formData: FormData): Promise<void> {
   revalidatePath(`/runs/${runId}`);
   redirect(`/runs/${runId}`);
 }
+
+export async function replayRunAction(formData: FormData): Promise<void> {
+  const sourceRunId = String(formData.get("sourceRunId") ?? "");
+  const workflowId = String(formData.get("workflowId") ?? "");
+  const workflowVersion = Number(formData.get("workflowVersion") ?? 0);
+  const replayReason = String(formData.get("replayReason") ?? "Recovery replay requested by operator.");
+
+  if (!sourceRunId || !workflowId || !Number.isInteger(workflowVersion) || workflowVersion < 1) {
+    return;
+  }
+
+  const requestHeaders = await headers();
+  const caller = await createServerCaller({ headers: requestHeaders });
+  const workflowVersionDetail = await caller.getWorkflowVersion({
+    workflowId,
+    version: workflowVersion
+  });
+
+  const replay = await caller.replayRun({
+    sourceRunId,
+    workflow: workflowVersionDetail.workflow,
+    replayReason
+  });
+
+  revalidatePath("/");
+  revalidatePath(`/runs/${sourceRunId}`);
+  revalidatePath(`/runs/${replay.runId}`);
+  redirect(`/runs/${replay.runId}`);
+}

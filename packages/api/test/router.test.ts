@@ -1470,6 +1470,93 @@ describe("createHarborRouter", () => {
     expect(calls[0]?.idempotencyKey).toBe("idem-1");
   });
 
+  it("replays a run with source input, replay metadata, and artifact linkage hook", async () => {
+    const runCalls: WorkflowRunRequest[] = [];
+    const replayLinks: Array<{
+      sourceRunId: string;
+      replayRunId: string;
+      workflowId: string;
+      reason: string;
+    }> = [];
+    const router = createRouter({
+      async runWorkflow(request) {
+        runCalls.push(request);
+        return {
+          runId: "run_replay_1",
+          status: "completed",
+          finalOutput: {
+            replayed: true
+          }
+        };
+      },
+      async linkReplayRuns(_context, input) {
+        replayLinks.push(input);
+      }
+    });
+
+    const caller = router.createCaller(scopedContext);
+    const result = await caller.replayRun({
+      sourceRunId: "run_1",
+      workflow,
+      replayReason: "Recover from stuck run."
+    });
+
+    expect(result.runId).toBe("run_replay_1");
+    expect(result.sourceRunId).toBe("run_1");
+    expect(result.sourceWorkflowId).toBe("wf_1");
+    expect(result.replayReason).toBe("Recover from stuck run.");
+    expect(runCalls[0]?.input).toEqual({ prompt: "hello" });
+    expect(runCalls[0]?.idempotencyKey).toBe("replay:run_1:1");
+    expect(replayLinks).toEqual([
+      {
+        sourceRunId: "run_1",
+        replayRunId: "run_replay_1",
+        workflowId: "wf_1",
+        reason: "Recover from stuck run."
+      }
+    ]);
+  });
+
+  it("replays a run without optional replay reason and link hook", async () => {
+    const calls: WorkflowRunRequest[] = [];
+    const router = createRouter({
+      async runWorkflow(request) {
+        calls.push(request);
+        return {
+          runId: "run_replay_default",
+          status: "completed"
+        };
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    const result = await caller.replayRun({
+      sourceRunId: "run_1",
+      workflow
+    });
+
+    expect(result.replayReason).toContain("Recovery replay requested by operator");
+    expect(calls[0]?.idempotencyKey).toBe("replay:run_1:1");
+  });
+
+  it("rejects replayRun when source run is missing", async () => {
+    const router = createRouter({
+      async getRun() {
+        return null;
+      }
+    });
+    const caller = router.createCaller(scopedContext);
+
+    await expect(
+      caller.replayRun({
+        sourceRunId: "missing",
+        workflow
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+  });
+
   it("rejects runWorkflow when policy verification fails", async () => {
     const router = createRouter({
       policyVerifier: {

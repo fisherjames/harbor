@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
-import { escalateRunAction } from "../../actions";
+import { escalateRunAction, replayRunAction } from "../../actions";
 import { deriveMemoryTrustMetricsFromArtifacts } from "@harbor/observability";
 
 interface RunDetailPageProps {
@@ -42,8 +42,14 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
     );
   }
 
+  const workflowVersions = await caller.listWorkflowVersions({ workflowId: run.workflowId });
+  const preferredReplayVersion =
+    workflowVersions.find((version) => version.state === "published") ?? workflowVersions[0] ?? null;
+
   const replayManifest = parseJsonArtifact<Record<string, unknown>>(run.artifacts["replay-bundle-manifest"]);
   const replayTaxonomy = parseJsonArtifact<Record<string, number>>(run.artifacts["replay-divergence-taxonomy"]);
+  const recoveryArtifact = parseJsonArtifact<Record<string, unknown>>(run.artifacts["stuck-run-recovery"]);
+  const deadLetterArtifact = parseJsonArtifact<Record<string, unknown>>(run.artifacts["stuck-run-dead-letter"]);
   const replayDivergenceCount = replayTaxonomy
     ? Object.values(replayTaxonomy).reduce((sum, value) => sum + value, 0)
     : 0;
@@ -92,6 +98,42 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             Escalate to Human
           </button>
         </form>
+      </section>
+      <section style={{ marginTop: 20 }}>
+        <h2>Safe Replay</h2>
+        {preferredReplayVersion ? (
+          <form action={replayRunAction} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input type="hidden" name="sourceRunId" value={run.runId} />
+            <input type="hidden" name="workflowId" value={run.workflowId} />
+            <input type="hidden" name="workflowVersion" value={preferredReplayVersion.version} />
+            <input
+              type="text"
+              name="replayReason"
+              defaultValue="Recovery replay requested by operator."
+              style={{ minWidth: 320, padding: 8 }}
+            />
+            <button type="submit" style={{ padding: "8px 14px" }}>
+              Replay from Source Input
+            </button>
+            <span style={{ fontSize: 12 }}>
+              Using workflow v{preferredReplayVersion.version} ({preferredReplayVersion.state})
+            </span>
+          </form>
+        ) : (
+          <p>No workflow versions are available yet for replay.</p>
+        )}
+        {deadLetterArtifact ? (
+          <p style={{ marginTop: 8 }}>
+            Dead-letter replay reference detected for this run. Recommended action:{" "}
+            <code>
+              {typeof deadLetterArtifact.replayReference === "object" &&
+              deadLetterArtifact.replayReference &&
+              "recommendedAction" in deadLetterArtifact.replayReference
+                ? String((deadLetterArtifact.replayReference as { recommendedAction: unknown }).recommendedAction)
+                : "replayRun"}
+            </code>
+          </p>
+        ) : null}
       </section>
       <section style={{ marginTop: 20 }}>
         <h2>Stage Timeline + Logs</h2>
@@ -151,6 +193,8 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
       </section>
       <section style={{ marginTop: 20 }}>
         <h2>Artifacts</h2>
+        {recoveryArtifact ? <p>Recovery artifact captured: stuck-run-recovery.</p> : null}
+        {deadLetterArtifact ? <p>Dead-letter artifact captured: stuck-run-dead-letter.</p> : null}
         {Object.keys(run.artifacts).length === 0 ? (
           <p>No artifacts recorded.</p>
         ) : (

@@ -9,14 +9,17 @@ Harden Harbor for operational reliability, production observability, and tenancy
 - Keep every reliability action trace-visible and audit-reconstructable.
 
 ## Progress Snapshot (2026-04-06)
-- Reliability stream is in progress.
+- Reliability stream is in progress with Stream A now implemented.
 - Implemented this slice:
 1. Added typed `listStuckRuns` contract in `@harbor/database` for cross-tenant stuck-run scanning.
 2. Added `runStuckRunRecoveryScan` in `@harbor/worker` with scheduled execution (`*/10 * * * *`).
 3. Added automatic safe recovery path: stale `running` runs are escalated to `needs_human` with recovery artifacts.
-4. Added full unit coverage for new branches in database and worker modules.
-5. Added a machine-checked feature catalog (`docs/features`) and `pnpm features:check` drift gate to keep implemented capabilities explicit.
-6. Added a typed benchmark-to-production bridge contract so deploy/publish/promotion flows return one unified harness progression path (lint → eval → promotion → adversarial → shadow) with explicit next action.
+4. Added dead-letter fallback for irrecoverable stuck runs (`failed` status + `stuck-run-dead-letter` artifact + replay reference).
+5. Added deterministic stuck-run recovery scope policies (`HARBOR_STUCK_RUN_POLICIES`) with tenant/workspace matching.
+6. Added typed `replayRun` API entrypoint and web action wiring to replay from source run input with replay linkage artifacts.
+7. Added full unit coverage for new branches in database, API, web, and worker modules.
+8. Added a machine-checked feature catalog (`docs/features`) and `pnpm features:check` drift gate to keep implemented capabilities explicit.
+9. Added a typed benchmark-to-production bridge contract so deploy/publish/promotion flows return one unified harness progression path (lint → eval → promotion → adversarial → shadow) with explicit next action.
 
 ## Streams
 
@@ -24,9 +27,9 @@ Harden Harbor for operational reliability, production observability, and tenancy
 Owner: `packages/database` + `apps/worker` + `packages/engine`
 
 Tasks:
-1. Add dead-letter capture for irrecoverable run failures with replay references.
-2. Add deterministic stuck-run detector policy controls by tenant/workspace.
-3. Add safe replay entrypoint from recovery artifacts.
+1. Completed: dead-letter capture for irrecoverable run failures with replay references.
+2. Completed: deterministic stuck-run detector policy controls by tenant/workspace.
+3. Completed: safe replay entrypoint from recovery artifacts.
 
 Definition of done:
 1. Stuck runs are recovered or dead-lettered automatically.

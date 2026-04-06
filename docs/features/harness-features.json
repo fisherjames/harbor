@@ -363,11 +363,13 @@
       "name": "Automatic stuck-run detection and recovery",
       "phase": "phase-3",
       "status": "complete",
-      "summary": "Scheduled detector scans stale running runs and escalates them with recovery artifacts.",
+      "summary": "Scheduled detector scans stale running runs, enforces tenant/workspace policies, escalates recoverable runs, and dead-letters irrecoverable runs with replay references.",
       "evidence": [
         "packages/database/src/repositories/run-store.ts",
         "packages/database/src/repositories/postgres-run-persistence.ts",
-        "apps/worker/src/inngest.ts"
+        "apps/worker/src/inngest.ts",
+        "packages/api/src/router.ts",
+        "apps/web/app/actions.ts"
       ],
       "assertions": [
         {
@@ -381,6 +383,18 @@
         {
           "path": "apps/worker/src/inngest.ts",
           "pattern": "\"stuck-run-recovery\""
+        },
+        {
+          "path": "apps/worker/src/inngest.ts",
+          "pattern": "\"stuck-run-dead-letter\""
+        },
+        {
+          "path": "packages/api/src/router.ts",
+          "pattern": "replayRun: authzProcedure.input(replayRunInputSchema)"
+        },
+        {
+          "path": "apps/web/app/actions.ts",
+          "pattern": "caller.replayRun("
         }
       ]
     },

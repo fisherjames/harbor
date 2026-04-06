@@ -1,5 +1,5 @@
 import type { HarnessRolloutMode, LintFinding, WorkflowDefinition } from "@harbor/harness";
-import type { RunStatus, StageExecutionRecord } from "@harbor/engine";
+import type { RunStatus, StageExecutionRecord, WorkflowRunResult } from "@harbor/engine";
 
 export type DeployGateStatus = "passed" | "failed" | "skipped";
 export type DeployBlockReason = "lint" | "eval" | "promotion" | "adversarial" | "shadow";
@@ -183,6 +183,20 @@ export interface EscalateRunOutput {
   runId: string;
   status: "needs_human";
   updatedAt: string;
+}
+
+export interface ReplayRunInput {
+  sourceRunId: string;
+  workflow: WorkflowDefinition;
+  replayReason?: string | undefined;
+  trigger?: "manual" | "api" | undefined;
+  idempotencyKey?: string | undefined;
+}
+
+export interface ReplayRunOutput extends WorkflowRunResult {
+  sourceRunId: string;
+  sourceWorkflowId: string;
+  replayReason: string;
 }
 
 export type WorkflowVersionState = "draft" | "published";

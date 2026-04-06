@@ -25,6 +25,8 @@ export type {
   ListRunsInput,
   EscalateRunInput,
   EscalateRunOutput,
+  ReplayRunInput,
+  ReplayRunOutput,
   WorkflowVersionState,
   WorkflowVersionSummary,
   SaveWorkflowVersionInput,

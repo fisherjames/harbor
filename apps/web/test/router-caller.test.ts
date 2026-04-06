@@ -97,6 +97,24 @@ describe("web server caller", () => {
     expect(runDetail.runId).toBe(run.runId);
     expect(runDetail.artifacts["run-isolation-session"]).toBeDefined();
 
+    const replay = await caller.replayRun({
+      sourceRunId: run.runId,
+      workflow: sampleWorkflow,
+      replayReason: "Recovery replay verification."
+    });
+    expect(replay.status).toBe("completed");
+    expect(replay.sourceRunId).toBe(run.runId);
+
+    const replayDetail = await caller.getRun({
+      runId: replay.runId
+    });
+    expect(replayDetail.artifacts["replay-parent-run"]).toBeDefined();
+
+    const sourceAfterReplay = await caller.getRun({
+      runId: run.runId
+    });
+    expect(sourceAfterReplay.artifacts["replay-child-run"]).toBeDefined();
+
     const escalated = await caller.escalateRun({
       runId: run.runId,
       reason: "Operator requested review"

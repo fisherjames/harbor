@@ -4,6 +4,7 @@ import {
   adversarialNightlyScheduled,
   functions,
   inngest,
+  resolveStuckRunRecoveryPolicies,
   runStuckRunRecoveryScan,
   stuckRunRecoveryScheduled,
   runNightlyAdversarialScan,
@@ -202,6 +203,7 @@ describe("worker exports", () => {
     ];
     const escalatedRuns: string[] = [];
     const artifactWrites: Array<{ runId: string; name: string }> = [];
+    const deadLetteredRuns: string[] = [];
 
     const fakeStore = {
       listStuckRuns: vi.fn(async () => candidates),
@@ -217,10 +219,15 @@ describe("worker exports", () => {
 
         return null;
       }),
+      updateStatus: vi.fn(async (runId: string, status: string) => {
+        if (status === "failed") {
+          deadLetteredRuns.push(runId);
+        }
+      }),
       storeArtifact: vi.fn(async (runId: string, name: string) => {
         artifactWrites.push({ runId, name });
       })
-    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "storeArtifact">;
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
 
     const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
       staleAfterSeconds: 600,
@@ -230,12 +237,17 @@ describe("worker exports", () => {
     expect(report.detectorId).toBe("stuck-run-recovery-v1");
     expect(report.scanned).toBe(2);
     expect(report.recovered).toBe(1);
-    expect(report.skipped).toBe(1);
+    expect(report.deadLettered).toBe(1);
+    expect(report.skipped).toBe(0);
     expect(report.runs).toHaveLength(2);
     expect(report.runs[0]?.status).toBe("recovered");
-    expect(report.runs[1]?.status).toBe("skipped");
+    expect(report.runs[1]?.status).toBe("dead_letter");
     expect(escalatedRuns).toEqual(["run_stale_1"]);
-    expect(artifactWrites).toEqual([{ runId: "run_stale_1", name: "stuck-run-recovery" }]);
+    expect(deadLetteredRuns).toEqual(["run_stale_2"]);
+    expect(artifactWrites).toEqual([
+      { runId: "run_stale_1", name: "stuck-run-recovery" },
+      { runId: "run_stale_2", name: "stuck-run-dead-letter" }
+    ]);
   });
 
   it("runs scheduled stuck-run recovery function", async () => {
@@ -244,13 +256,30 @@ describe("worker exports", () => {
     expect(typeof result.scanned).toBe("number");
   });
 
+  it("uses parsed scheduled env overrides for stuck-run recovery thresholds", async () => {
+    vi.stubEnv("HARBOR_STUCK_RUN_STALE_AFTER_SECONDS", "1200");
+    vi.stubEnv("HARBOR_STUCK_RUN_SCAN_LIMIT", "7");
+
+    const result = await stuckRunRecoveryScheduled.fn({});
+    expect(result.staleAfterSeconds).toBe(1200);
+  });
+
+  it("falls back to defaults when scheduled env thresholds are invalid", async () => {
+    vi.stubEnv("HARBOR_STUCK_RUN_STALE_AFTER_SECONDS", "not-a-number");
+    vi.stubEnv("HARBOR_STUCK_RUN_SCAN_LIMIT", "0");
+
+    const result = await stuckRunRecoveryScheduled.fn({});
+    expect(result.staleAfterSeconds).toBe(900);
+  });
+
   it("uses default stuck-run scan thresholds when input overrides are omitted", async () => {
     const listStuckRuns = vi.fn(async () => [] as StuckRunCandidate[]);
     const fakeStore = {
       listStuckRuns,
       escalateRun: vi.fn(async () => null),
+      updateStatus: vi.fn(async () => undefined),
       storeArtifact: vi.fn(async () => undefined)
-    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "storeArtifact">;
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
 
     const report = await runStuckRunRecoveryScan(fakeStore as RunStore);
 
@@ -260,6 +289,448 @@ describe("worker exports", () => {
     });
     expect(report.scanned).toBe(0);
     expect(report.recovered).toBe(0);
+    expect(report.deadLettered).toBe(0);
+  });
+
+  it("applies scope policies and skips runs when policy disables recovery", async () => {
+    const staleCandidates: StuckRunCandidate[] = [
+      {
+        runId: "run_scope_1",
+        tenantId: "tenant_1",
+        workspaceId: "workspace_a",
+        workflowId: "wf_a",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      },
+      {
+        runId: "run_scope_2",
+        tenantId: "tenant_1",
+        workspaceId: "workspace_b",
+        workflowId: "wf_b",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      }
+    ];
+    const escalated: string[] = [];
+
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => staleCandidates),
+      escalateRun: vi.fn(async (_scope, input) => {
+        escalated.push(input.runId);
+        return {
+          runId: input.runId,
+          status: "needs_human" as const,
+          updatedAt: "2026-01-01T01:00:00.000Z"
+        };
+      }),
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 10,
+      policies: [
+        {
+          tenantId: "tenant_1",
+          workspaceId: "workspace_a",
+          staleAfterSeconds: 60,
+          limit: 1,
+          enabled: true
+        },
+        {
+          tenantId: "tenant_1",
+          workspaceId: "workspace_b",
+          staleAfterSeconds: 60,
+          limit: 1,
+          enabled: false
+        }
+      ]
+    });
+
+    expect(report.recovered).toBe(1);
+    expect(report.deadLettered).toBe(0);
+    expect(report.skipped).toBe(1);
+    expect(escalated).toEqual(["run_scope_1"]);
+    expect(report.runs.find((run) => run.runId === "run_scope_2")?.status).toBe("skipped");
+  });
+
+  it("skips candidates that are below the scope stale threshold", async () => {
+    const candidate: StuckRunCandidate = {
+      runId: "run_too_fresh",
+      tenantId: "tenant_1",
+      workspaceId: "workspace_1",
+      workflowId: "wf_1",
+      status: "running",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: new Date().toISOString()
+    };
+    const escalateRun = vi.fn(async () => null);
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [candidate]),
+      escalateRun,
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 10,
+      policies: [
+        {
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          staleAfterSeconds: 3600,
+          limit: 10,
+          enabled: true
+        }
+      ]
+    });
+
+    expect(escalateRun).not.toHaveBeenCalled();
+    expect(report.recovered).toBe(0);
+    expect(report.deadLettered).toBe(0);
+    expect(report.skipped).toBe(1);
+    expect(report.runs[0]?.reason).toContain("below scope stale threshold");
+  });
+
+  it("enforces scope recovery limit after first successful recovery", async () => {
+    const oldTimestamp = "2026-01-01T00:00:00.000Z";
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_limit_1",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_1",
+          status: "running" as const,
+          createdAt: oldTimestamp,
+          updatedAt: oldTimestamp
+        },
+        {
+          runId: "run_limit_2",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_1",
+          status: "running" as const,
+          createdAt: oldTimestamp,
+          updatedAt: oldTimestamp
+        }
+      ]),
+      escalateRun: vi.fn(async (_scope, input) => ({
+        runId: input.runId,
+        status: "needs_human" as const,
+        updatedAt: "2026-01-01T01:00:00.000Z"
+      })),
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 10,
+      policies: [
+        {
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          staleAfterSeconds: 60,
+          limit: 1,
+          enabled: true
+        }
+      ]
+    });
+
+    expect(report.recovered).toBe(1);
+    expect(report.deadLettered).toBe(0);
+    expect(report.skipped).toBe(1);
+    expect(report.runs.find((run) => run.runId === "run_limit_2")?.reason).toContain("Scope recovery limit reached");
+  });
+
+  it("treats invalid updatedAt timestamps as stale during recovery evaluation", async () => {
+    const escalateRun = vi.fn(async (_scope, input) => ({
+      runId: input.runId,
+      status: "needs_human" as const,
+      updatedAt: "2026-01-01T01:00:00.000Z"
+    }));
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_invalid_updated_at",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_invalid",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "not-a-date"
+        }
+      ]),
+      escalateRun,
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 120,
+      limit: 5
+    });
+
+    expect(escalateRun).toHaveBeenCalledTimes(1);
+    expect(report.recovered).toBe(1);
+    expect(report.deadLettered).toBe(0);
+  });
+
+  it("falls back to default policy when configured scope policy does not match tenant/workspace", async () => {
+    const escalateRun = vi.fn(async (_scope, input) => ({
+      runId: input.runId,
+      status: "needs_human" as const,
+      updatedAt: "2026-01-01T01:00:00.000Z"
+    }));
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_policy_fallback",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_1",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]),
+      escalateRun,
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 5,
+      policies: [
+        {
+          tenantId: "tenant_other",
+          workspaceId: "workspace_other",
+          staleAfterSeconds: 300,
+          limit: 1,
+          enabled: false
+        }
+      ]
+    });
+
+    expect(escalateRun).toHaveBeenCalledTimes(1);
+    expect(report.recovered).toBe(1);
+    expect(report.skipped).toBe(0);
+  });
+
+  it("supports wildcard scope policies for matched candidate recovery", async () => {
+    const escalateRun = vi.fn(async (_scope, input) => ({
+      runId: input.runId,
+      status: "needs_human" as const,
+      updatedAt: "2026-01-01T01:00:00.000Z"
+    }));
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_wildcard_policy",
+          tenantId: "tenant_x",
+          workspaceId: "workspace_y",
+          workflowId: "wf_wildcard",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]),
+      escalateRun,
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 5,
+      policies: [
+        {
+          tenantId: "*",
+          workspaceId: "*",
+          staleAfterSeconds: 30,
+          limit: 5,
+          enabled: true
+        }
+      ]
+    });
+
+    expect(escalateRun).toHaveBeenCalledTimes(1);
+    expect(report.recovered).toBe(1);
+  });
+
+  it("dead-letters runs when escalation throws and records escalation error context", async () => {
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_escalation_throw",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_1",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]),
+      escalateRun: vi.fn(async () => {
+        throw new Error("escalation transport failure");
+      }),
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 5
+    });
+
+    expect(report.recovered).toBe(0);
+    expect(report.deadLettered).toBe(1);
+    expect(report.skipped).toBe(0);
+    expect(report.runs[0]?.status).toBe("dead_letter");
+  });
+
+  it("handles non-Error escalation failures and still dead-letters candidate", async () => {
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_non_error_throw",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_1",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]),
+      escalateRun: vi.fn(async () => {
+        throw "transport failure";
+      }),
+      updateStatus: vi.fn(async () => undefined),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 5
+    });
+
+    expect(report.deadLettered).toBe(1);
+    expect(report.runs[0]?.status).toBe("dead_letter");
+  });
+
+  it("marks candidate as skipped when dead-letter persistence fails", async () => {
+    const fakeStore = {
+      listStuckRuns: vi.fn(async () => [
+        {
+          runId: "run_dead_letter_failure",
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          workflowId: "wf_2",
+          status: "running" as const,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]),
+      escalateRun: vi.fn(async () => null),
+      updateStatus: vi.fn(async () => {
+        throw new Error("missing run");
+      }),
+      storeArtifact: vi.fn(async () => undefined)
+    } satisfies Pick<RunStore, "listStuckRuns" | "escalateRun" | "updateStatus" | "storeArtifact">;
+
+    const report = await runStuckRunRecoveryScan(fakeStore as RunStore, {
+      staleAfterSeconds: 60,
+      limit: 5
+    });
+
+    expect(report.recovered).toBe(0);
+    expect(report.deadLettered).toBe(0);
+    expect(report.skipped).toBe(1);
+    expect(report.runs[0]?.status).toBe("skipped");
+    expect(report.runs[0]?.reason).toContain("Dead-letter fallback failed");
+  });
+
+  it("parses scoped stuck-run policies from JSON env payload", () => {
+    const policies = resolveStuckRunRecoveryPolicies(
+      JSON.stringify([
+        null,
+        42,
+        {
+          tenantId: "tenant_1",
+          workspaceId: "workspace_1",
+          staleAfterSeconds: 120,
+          limit: 12,
+          enabled: true
+        },
+        {
+          tenantId: "*",
+          workspaceId: "*",
+          staleAfterSeconds: 900,
+          limit: 100
+        }
+      ])
+    );
+
+    expect(policies).toHaveLength(2);
+    expect(policies[0]).toMatchObject({
+      tenantId: "tenant_1",
+      workspaceId: "workspace_1",
+      staleAfterSeconds: 120,
+      limit: 12,
+      enabled: true
+    });
+    expect(policies[1]).toMatchObject({
+      tenantId: "*",
+      workspaceId: "*",
+      staleAfterSeconds: 900,
+      limit: 100,
+      enabled: true
+    });
+
+    const invalid = resolveStuckRunRecoveryPolicies("{not-json");
+    expect(invalid).toEqual([]);
+
+    const nonArray = resolveStuckRunRecoveryPolicies(JSON.stringify({ tenantId: "tenant_1" }));
+    expect(nonArray).toEqual([]);
+
+    const fallbackValues = resolveStuckRunRecoveryPolicies(
+      JSON.stringify([
+        {
+          tenantId: 42,
+          workspaceId: null,
+          staleAfterSeconds: "bad",
+          limit: null
+        },
+        {
+          tenantId: "",
+          workspaceId: "",
+          staleAfterSeconds: -1,
+          limit: 0
+        }
+      ]),
+      {
+        staleAfterSeconds: 77,
+        limit: 55
+      }
+    );
+    expect(fallbackValues[0]).toMatchObject({
+      tenantId: "*",
+      workspaceId: "*",
+      staleAfterSeconds: 77,
+      limit: 55
+    });
+    expect(fallbackValues[1]).toMatchObject({
+      tenantId: "*",
+      workspaceId: "*",
+      staleAfterSeconds: 77,
+      limit: 55
+    });
   });
 
   it("defaults nightly fixtures to empty when file payload omits fixtures array", () => {

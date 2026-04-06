@@ -349,6 +349,30 @@ export function getAppRouter(): AppRouter {
     async runShadowGate(_context, input) {
       return resolveShadowGateSummary(input);
     },
+    async linkReplayRuns(_context, input) {
+      const linkedAt = new Date().toISOString();
+      await runStore.storeArtifact(
+        input.sourceRunId,
+        "replay-child-run",
+        JSON.stringify({
+          replayRunId: input.replayRunId,
+          workflowId: input.workflowId,
+          reason: input.reason,
+          linkedAt
+        })
+      );
+
+      await runStore.storeArtifact(
+        input.replayRunId,
+        "replay-parent-run",
+        JSON.stringify({
+          sourceRunId: input.sourceRunId,
+          workflowId: input.workflowId,
+          reason: input.reason,
+          linkedAt
+        })
+      );
+    },
     policyVerifier
   });
 

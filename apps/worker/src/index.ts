@@ -6,9 +6,11 @@ export {
   stuckRunRecoveryScheduled,
   runNightlyAdversarialScan,
   runStuckRunRecoveryScan,
+  resolveStuckRunRecoveryPolicies,
   type AdversarialNightlyFixture,
   type AdversarialNightlyReport,
   type AdversarialNightlyWorkflowReport,
+  type StuckRunRecoveryScopePolicy,
   type StuckRunRecoveryReport,
   type StuckRunRecoveryRecord
 } from "./inngest.js";
