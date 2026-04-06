@@ -59,6 +59,7 @@ Set providers:
 
 ```bash
 pnpm check
+pnpm runbook:check
 pnpm legibility:check
 pnpm standards:check
 ```

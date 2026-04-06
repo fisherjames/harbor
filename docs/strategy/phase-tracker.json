@@ -107,7 +107,9 @@
         "docs/architecture/decision-records/0012-benchmark-to-production-bridge.md",
         "docs/features/harness-features.json",
         "docs/strategy/features-contract.json",
-        "scripts/features-drift-check.mjs"
+        "scripts/features-drift-check.mjs",
+        "scripts/runbook-drift-check.mjs",
+        "docs/operations/phase-3-runbook.md"
       ]
     },
     {

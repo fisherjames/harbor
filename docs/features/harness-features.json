@@ -478,6 +478,41 @@
       ]
     },
     {
+      "id": "phase3-artifact-generated-runbook-gate",
+      "name": "Phase 3 artifact-generated production runbook gate",
+      "phase": "phase-3",
+      "status": "complete",
+      "summary": "Operational runbook is generated from reliability artifacts/reports and enforced by a dedicated drift gate in the root check pipeline.",
+      "evidence": [
+        "scripts/runbook-drift-check.mjs",
+        "docs/operations/phase-3-runbook.md",
+        "docs/strategy/documentation-contract.json",
+        "package.json"
+      ],
+      "assertions": [
+        {
+          "path": "scripts/runbook-drift-check.mjs",
+          "pattern": "const runbookPath = \"docs/operations/phase-3-runbook.md\""
+        },
+        {
+          "path": "scripts/runbook-drift-check.mjs",
+          "pattern": "## Run Artifact Decision Matrix"
+        },
+        {
+          "path": "docs/operations/phase-3-runbook.md",
+          "pattern": "## Harness Resolution Steps"
+        },
+        {
+          "path": "docs/strategy/documentation-contract.json",
+          "pattern": "docs/operations/phase-3-runbook.md"
+        },
+        {
+          "path": "package.json",
+          "pattern": "\"runbook:check\": \"node ./scripts/runbook-drift-check.mjs\""
+        }
+      ]
+    },
+    {
       "id": "benchmark-to-production-bridge",
       "name": "Benchmark-to-production bridge contract",
       "phase": "phase-3",
@@ -524,7 +559,7 @@
       "assertions": [
         {
           "path": "package.json",
-          "pattern": "\"check\": \"pnpm vision:check && pnpm docs:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check"
+          "pattern": "\"check\": \"pnpm vision:check && pnpm docs:check && pnpm runbook:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check"
         }
       ]
     }

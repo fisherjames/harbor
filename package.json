@@ -11,6 +11,7 @@
     "test": "turbo run test",
     "vision:check": "node ./scripts/vision-drift-check.mjs",
     "docs:check": "node ./scripts/docs-drift-check.mjs",
+    "runbook:check": "node ./scripts/runbook-drift-check.mjs",
     "features:check": "node ./scripts/features-drift-check.mjs",
     "legibility:check": "node ./scripts/agent-legibility-check.mjs",
     "standards:check": "node ./scripts/standards-encoding-check.mjs",
@@ -20,7 +21,7 @@
     "replay:verify": "node ./scripts/replay-verify.mjs",
     "policy:bundle": "node ./scripts/policy-bundle.mjs",
     "clean": "turbo run clean",
-    "check": "pnpm vision:check && pnpm docs:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check && pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm vision:check && pnpm docs:check && pnpm runbook:check && pnpm features:check && pnpm legibility:check && pnpm standards:check && pnpm evaluator:check && pnpm adversarial:check && pnpm inference:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

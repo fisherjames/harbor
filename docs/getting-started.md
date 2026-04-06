@@ -30,6 +30,7 @@
 9. Validate docs/vision contracts before milestone changes:
 - `pnpm vision:check`
 - `pnpm docs:check`
+- `pnpm runbook:check`
 - `pnpm features:check`
 - `pnpm legibility:check`
 - `pnpm standards:check`
@@ -46,6 +47,7 @@
 - Keep implemented feature inventory synchronized in `docs/features/harness-features.json` and validate with `pnpm features:check`.
 - Keep promotion guarantees documented: deploy/publish must report eval gate and GitHub promotion check outcomes.
 - Keep benchmark-to-production bridge guarantees documented: deploy/publish/promotion APIs must return one unified gate progression path with explicit next action.
+- Keep Phase 3 Production Runbook generated and current with `pnpm runbook:check`.
 - Keep repository legibility guarantees documented: docs index, workspace READMEs, and naming conventions must pass `pnpm legibility:check`.
 - Keep team standards encoding guarantees documented: instruction anatomy and calibration history must pass `pnpm standards:check`.
 - Keep team standards drift report current at `docs/team-standards/reports/latest.json`.
@@ -74,6 +76,6 @@
 - `phase-2.5` (Harness + Legibility Hardening): docs/index hardening, workspace legibility, repository map drift checks, and agent legibility gates.
 - `phase-2.6` (Team Standards Encoding): Fowler-style standards files, HAR coverage/examples packs, calibration freshness checks, and CI-enforced standards drift checks.
 - `phase-2.8` (Harness Principles Addendum): confidence-gated autonomy, two-phase side-effect protocol, deterministic replay bundles, shadow/canary harness rollout, evaluator calibration, adversarial suites, signed policy bundles, and memory trust/conflict controls.
-- `phase-3` (Polished Production): idempotency hardening, stuck-run recovery automation, replay tooling, benchmark-to-production bridge unification, operational dashboards.
+- `phase-3` (Polished Production): idempotency hardening, stuck-run recovery automation, replay tooling, benchmark-to-production bridge unification, operational dashboards, and artifact-generated production runbooks.
 - `phase-4` (Enterprise Foundation): SAML/SCIM, immutable audit exports, policy governance.
 - `phase-5` (Full Enterprise Product): self-host packaging, HA topology, contract-grade SLO reporting.

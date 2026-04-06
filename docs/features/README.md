@@ -27,6 +27,7 @@ This catalog is the explicit source of truth for implemented product/harness cap
 - `stuck-run-detection-recovery`
 - `phase3-reliability-observability-facets`
 - `phase3-run-compare-onboarding-memory-explorer`
+- `phase3-artifact-generated-runbook-gate`
 - `benchmark-to-production-bridge`
 - `machine-drift-gate-stack`
 

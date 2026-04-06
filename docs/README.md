@@ -32,6 +32,7 @@ This index is the canonical entrypoint for both humans and coding agents.
 
 ## Operations
 - [`/Users/james/Documents/GitHub/harbor/docs/operations/local-docker-stack.md`](/Users/james/Documents/GitHub/harbor/docs/operations/local-docker-stack.md)
+- [`/Users/james/Documents/GitHub/harbor/docs/operations/phase-3-runbook.md`](/Users/james/Documents/GitHub/harbor/docs/operations/phase-3-runbook.md)
 
 ## Team Standards
 - [`/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md`](/Users/james/Documents/GitHub/harbor/docs/team-standards/README.md)

@@ -28,6 +28,7 @@
     "ephemeral-observability-envelope",
     "memory-trust-conflict-metrics",
     "stuck-run-detection-recovery",
+    "phase3-artifact-generated-runbook-gate",
     "benchmark-to-production-bridge",
     "machine-drift-gate-stack"
   ],

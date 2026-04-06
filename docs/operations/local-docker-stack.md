@@ -56,6 +56,7 @@ docker compose logs -f web worker inngest
 
 Use the worker health payload to verify effective provider wiring (`requested` vs `effective` model provider, memU endpoint, database branch).
 Each run also records `run-isolation-session` artifacts including worktree path and isolation mode.
+Generate the Phase 3 incident runbook snapshot before promotion decisions: `pnpm runbook:check`.
 
 ## Teardown
 

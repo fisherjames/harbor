@@ -24,6 +24,7 @@ Harden Harbor for operational reliability, production observability, and tenancy
 11. Added full branch coverage tests for Stream B observability contracts in `@harbor/observability`.
 12. Added Stream C operator UX surfaces: version-aware run compare, guided onboarding template run path, and memory explorer snapshot over recent run artifacts.
 13. Added typed `compareRuns` API contract with full branch coverage and UI integration on run detail pages.
+14. Added Stream D artifact-generated production runbook with a dedicated drift gate (`pnpm runbook:check`) wired into root quality checks.
 
 ## Streams
 
@@ -63,6 +64,19 @@ Tasks:
 Definition of done:
 1. New users can run a template workflow in one guided path.
 2. Operators can compare behavior across versions without raw log parsing.
+
+### Stream D: Operational Runbook Automation
+Owner: `docs/operations` + `scripts`
+
+Tasks:
+1. Completed: generated Phase 3 production runbook from artifact/report signals.
+2. Completed: runbook drift gate script wired into root check pipeline.
+3. Completed: docs contract + feature catalog include runbook evidence.
+
+Definition of done:
+1. `pnpm runbook:check` regenerates and validates a deterministic runbook.
+2. Runbook includes artifact decision matrix + harness resolution steps.
+3. Root `pnpm check` fails when runbook drifts from source signals/contracts.
 
 ## Exit Criteria
 1. Phase 3 reliability tasks are implemented with strict typing and 100% unit coverage.

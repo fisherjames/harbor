@@ -14,7 +14,8 @@
     "docs/evaluator/README.md",
     "docs/adversarial/README.md",
     "docs/team-standards/README.md",
-    "docs/strategy/team-standards-contract.json"
+    "docs/strategy/team-standards-contract.json",
+    "docs/operations/phase-3-runbook.md"
   ],
   "gettingStarted": {
     "metadataStart": "<!-- DOCS_CADENCE_METADATA_BEGIN -->",
@@ -30,6 +31,7 @@
       "pnpm check",
       "pnpm vision:check",
       "pnpm docs:check",
+      "pnpm runbook:check",
       "pnpm features:check",
       "pnpm legibility:check",
       "pnpm standards:check",
@@ -40,7 +42,8 @@
       "worktree-bound",
       "ephemeral observability",
       "idempotency key",
-      "Harness Resolution Steps"
+      "Harness Resolution Steps",
+      "Phase 3 Production Runbook"
     ]
   }
 }
