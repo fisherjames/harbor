@@ -4,6 +4,46 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+
+function loadEnvFile(relativePath) {
+  const filePath = path.join(root, relativePath);
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const contents = fs.readFileSync(filePath, "utf8");
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const keyPart = line.slice(0, separatorIndex).trim();
+    const key = keyPart.startsWith("export ") ? keyPart.slice("export ".length).trim() : keyPart;
+    if (!key || process.env[key] !== undefined) {
+      continue;
+    }
+
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value.replace(/\\n/g, "\n");
+  }
+}
+
+loadEnvFile(".env.local");
+loadEnvFile(".env");
+
 const generatedAt = new Date().toISOString();
 const mode = (process.env.HARBOR_INFERENCE_GATE_MODE ?? "report").trim().toLowerCase();
 const apiKey = (process.env.OPENAI_API_KEY ?? "").trim();

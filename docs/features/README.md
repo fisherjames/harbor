@@ -25,6 +25,7 @@ This catalog is the explicit source of truth for implemented product/harness cap
 - `ephemeral-observability-envelope`
 - `memory-trust-conflict-metrics`
 - `stuck-run-detection-recovery`
+- `phase3-reliability-observability-facets`
 - `benchmark-to-production-bridge`
 - `machine-drift-gate-stack`
 

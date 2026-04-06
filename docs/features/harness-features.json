@@ -399,6 +399,40 @@
       ]
     },
     {
+      "id": "phase3-reliability-observability-facets",
+      "name": "Phase 3 reliability observability facets and alert hooks",
+      "phase": "phase-3",
+      "status": "complete",
+      "summary": "Home dashboard surfaces run-health facets, per-workflow reliability summaries, and typed reliability budget alert hook payloads.",
+      "evidence": [
+        "packages/observability/src/index.ts",
+        "packages/observability/test/index.test.ts",
+        "apps/web/app/page.tsx"
+      ],
+      "assertions": [
+        {
+          "path": "packages/observability/src/index.ts",
+          "pattern": "export function deriveRunHealthFacets"
+        },
+        {
+          "path": "packages/observability/src/index.ts",
+          "pattern": "export function deriveWorkflowReliabilitySummaries"
+        },
+        {
+          "path": "packages/observability/src/index.ts",
+          "pattern": "export function createReliabilityAlertHookPayload"
+        },
+        {
+          "path": "apps/web/app/page.tsx",
+          "pattern": "Run Health Facets"
+        },
+        {
+          "path": "apps/web/app/page.tsx",
+          "pattern": "Reliability Budget Alerts"
+        }
+      ]
+    },
+    {
       "id": "benchmark-to-production-bridge",
       "name": "Benchmark-to-production bridge contract",
       "phase": "phase-3",

@@ -20,6 +20,8 @@ Harden Harbor for operational reliability, production observability, and tenancy
 7. Added full unit coverage for new branches in database, API, web, and worker modules.
 8. Added a machine-checked feature catalog (`docs/features`) and `pnpm features:check` drift gate to keep implemented capabilities explicit.
 9. Added a typed benchmark-to-production bridge contract so deploy/publish/promotion flows return one unified harness progression path (lint → eval → promotion → adversarial → shadow) with explicit next action.
+10. Added Stream B reliability observability surfaces: run-health facets, per-workflow P95/failure taxonomy summaries, and typed reliability budget alert hook payload rendering on the home dashboard.
+11. Added full branch coverage tests for Stream B observability contracts in `@harbor/observability`.
 
 ## Streams
 
@@ -40,9 +42,9 @@ Definition of done:
 Owner: `packages/observability` + `apps/web`
 
 Tasks:
-1. Add run-health dashboard facets for stuck, recovered, dead-letter, and replay parity.
-2. Add per-workflow P95 latency and failure-taxonomy views.
-3. Add alert hooks for sustained reliability budget breaches.
+1. Completed: run-health dashboard facets for stuck, recovered, dead-letter, and replay parity.
+2. Completed: per-workflow P95 latency and failure-taxonomy views.
+3. Completed: alert hook payload generation for sustained reliability budget breaches.
 
 Definition of done:
 1. Reliability KPIs are queryable by tenant/workspace/workflow.

@@ -3,13 +3,52 @@ import { headers } from "next/headers";
 import { createServerCaller } from "@/src/server/caller";
 import { sampleWorkflow } from "@/src/lib/sample-workflow";
 import { openWorkflowBuilderAction, runSampleWorkflowAction } from "./actions";
-import type { RunSummary } from "@harbor/api";
+import type { RunDetail, RunSummary } from "@harbor/api";
+import {
+  createReliabilityAlertHookPayload,
+  deriveRunHealthFacets,
+  deriveWorkflowReliabilitySummaries
+} from "@harbor/observability";
+
+function resolveStaleAfterSeconds(): number {
+  const parsed = Number(process.env.HARBOR_STUCK_RUN_STALE_AFTER_SECONDS);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 900;
+  }
+
+  return Math.floor(parsed);
+}
 
 export default async function HomePage() {
   const requestHeaders = await headers();
   const caller = await createServerCaller({ headers: requestHeaders });
   const saveResult = await caller.saveWorkflow({ workflow: sampleWorkflow });
   const runs = (await caller.listRuns({ limit: 20 })) as RunSummary[];
+  const runDetails = (
+    await Promise.all(
+      runs.map(async (run) => {
+        const detail = await caller.getRun({ runId: run.runId });
+        return detail;
+      })
+    )
+  ).filter((run): run is RunDetail => run !== null);
+  const runHealthObservations = runDetails.map((run) => ({
+    runId: run.runId,
+    workflowId: run.workflowId,
+    status: run.status,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
+    stages: run.stages.map((stage) => ({
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt
+    })),
+    artifacts: run.artifacts
+  }));
+  const runHealthFacets = deriveRunHealthFacets(runHealthObservations, {
+    staleAfterSeconds: resolveStaleAfterSeconds()
+  });
+  const workflowReliabilitySummaries = deriveWorkflowReliabilitySummaries(runHealthObservations);
+  const reliabilityAlertHookPayload = createReliabilityAlertHookPayload(workflowReliabilitySummaries);
 
   return (
     <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system", maxWidth: 1100 }}>
@@ -79,6 +118,93 @@ export default async function HomePage() {
             </tbody>
           </table>
         )}
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h2>Run Health Facets</h2>
+        <p>
+          Total: {runHealthFacets.totalRuns} | Queued: {runHealthFacets.queuedRuns} | Running:{" "}
+          {runHealthFacets.runningRuns} | Stuck: {runHealthFacets.stuckRuns}
+        </p>
+        <p>
+          Needs human: {runHealthFacets.needsHumanRuns} | Failed: {runHealthFacets.failedRuns} | Completed:{" "}
+          {runHealthFacets.completedRuns}
+        </p>
+        <p>
+          Recovered: {runHealthFacets.recoveredRuns} | Dead-letter: {runHealthFacets.deadLetterRuns}
+        </p>
+        <p>
+          Replay parent: {runHealthFacets.replayParentRuns} | Replay child: {runHealthFacets.replayChildRuns}
+        </p>
+        <p>
+          Replay parity baseline: {runHealthFacets.replayParityBaselineRuns} | Replay divergence:{" "}
+          {runHealthFacets.replayDivergenceRuns} | Replay manifest missing:{" "}
+          {runHealthFacets.replayMissingManifestRuns}
+        </p>
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h2>Workflow Reliability</h2>
+        {workflowReliabilitySummaries.length === 0 ? (
+          <p>No workflow reliability data yet.</p>
+        ) : (
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>Workflow</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>Runs</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>P95 ms</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Failure rate
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Needs-human rate
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Dead-letter rate
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "8px 4px" }}>
+                  Failure taxonomy
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {workflowReliabilitySummaries.map((summary) => (
+                <tr key={summary.workflowId}>
+                  <td style={{ padding: "8px 4px" }}>{summary.workflowId}</td>
+                  <td style={{ padding: "8px 4px" }}>{summary.runCount}</td>
+                  <td style={{ padding: "8px 4px" }}>{summary.p95LatencyMs}</td>
+                  <td style={{ padding: "8px 4px" }}>{summary.failureRate}</td>
+                  <td style={{ padding: "8px 4px" }}>{summary.needsHumanRate}</td>
+                  <td style={{ padding: "8px 4px" }}>{summary.deadLetterRate}</td>
+                  <td style={{ padding: "8px 4px" }}>
+                    failed={summary.failedRuns}, needs_human={summary.needsHumanRuns}, dead_letter=
+                    {summary.deadLetterRuns}, replay_divergence={summary.replayDivergenceRuns}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h2>Reliability Budget Alerts</h2>
+        <p>Active alerts: {reliabilityAlertHookPayload.alertCount}</p>
+        {reliabilityAlertHookPayload.alerts.length === 0 ? (
+          <p>No reliability budget breaches detected.</p>
+        ) : (
+          <ul>
+            {reliabilityAlertHookPayload.alerts.map((alert) => (
+              <li key={alert.alertId}>
+                [{alert.severity}] {alert.workflowId} {alert.category}: {alert.message}
+              </li>
+            ))}
+          </ul>
+        )}
+        <details>
+          <summary>Alert Hook Payload</summary>
+          <pre style={{ whiteSpace: "pre-wrap", background: "#f6f6f6", padding: 10 }}>
+            {JSON.stringify(reliabilityAlertHookPayload, null, 2)}
+          </pre>
+        </details>
       </section>
     </main>
   );

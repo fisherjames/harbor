@@ -1,8 +1,158 @@
 {
-  "generatedAt": "2026-04-06T14:52:27.167Z",
+  "generatedAt": "2026-04-06T15:44:09.453Z",
   "mode": "report",
-  "status": "skipped",
-  "skipped": true,
-  "reason": "OPENAI_API_KEY is not set.",
+  "status": "aligned",
+  "skipped": false,
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "usage": {
+    "promptTokens": 8030,
+    "completionTokens": 1585,
+    "totalTokens": 9615,
+    "inputCostPer1k": 0.0004,
+    "outputCostPer1k": 0.0016,
+    "estimatedCostUsd": 0.005748
+  },
+  "drift": {
+    "status": "aligned",
+    "critical": [],
+    "warnings": [],
+    "recommendations": [
+      "Continue enforcing all locked decisions and non-negotiable invariants strictly",
+      "Maintain discipline on milestone cadence updates and docs verification",
+      "Keep running all drift and calibration checks (vision, docs, legibility, standards, evaluator, adversarial, inference) before merges",
+      "Ensure all new behavior includes success and failure path tests",
+      "Regularly update and verify phase status metadata and evidence paths",
+      "Sustain nightly adversarial taxonomy runs and evaluator calibration freshness",
+      "Preserve repository legibility and team standards encoding with automated drift gates",
+      "Use inference drift reports to preemptively address potential drift before enforcement mode",
+      "Keep benchmark-to-production bridge contract and promotion gates unified and up to date",
+      "Continue to document and enforce run isolation and ephemeral observability guarantees"
+    ]
+  },
+  "lintHints": {
+    "ruleHints": [
+      {
+        "ruleId": "HAR006",
+        "hint": "Ensure the workflow system prompt is non-empty and includes explicit role, constraints, and verification posture.",
+        "resolutionSteps": [
+          "Set a non-empty workflow.systemPrompt with clear instructions.",
+          "Include explicit role definitions, constraints, and verification intent in the prompt.",
+          "Reject deployment or execution if the system prompt is blank."
+        ],
+        "migrationRisk": "low"
+      },
+      {
+        "ruleId": "HAR007",
+        "hint": "Add explicit constraint language using MUST, NEVER, DO NOT, or ONLY to the workflow system prompt.",
+        "resolutionSteps": [
+          "Incorporate non-negotiable guardrail language in the system prompt.",
+          "Document tool and data boundaries clearly within the prompt.",
+          "Keep constraints concise and testable."
+        ],
+        "migrationRisk": "low"
+      },
+      {
+        "ruleId": "HAR008",
+        "hint": "Include verification and acceptance language such as PASS, FAIL, VERIFY, or ACCEPTANCE in the system prompt.",
+        "resolutionSteps": [
+          "Define explicit verification expectations in the prompt.",
+          "Add PASS/FAIL acceptance criteria for workflow outputs.",
+          "Ensure verification language is clear and actionable."
+        ],
+        "migrationRisk": "low"
+      },
+      {
+        "ruleId": "HAR010",
+        "hint": "For commit tool nodes, ensure a matching propose phaseGroup node exists to enable preview and verification before commit.",
+        "resolutionSteps": [
+          "Add a tool node with sideEffectMode='propose' and matching phaseGroup before commit nodes.",
+          "Keep commit nodes with sideEffectMode='commit' and the same phaseGroup.",
+          "Emit preview artifact hash prior to executing commit actions."
+        ],
+        "migrationRisk": "medium"
+      },
+      {
+        "ruleId": "HAR003",
+        "hint": "Specify timeoutMs and retryLimit for each node to manage execution time and retry budgets.",
+        "resolutionSteps": [
+          "Add timeoutMs and retryLimit properties to all nodes missing them.",
+          "Implement escalation to human operators after retry budget exhaustion."
+        ],
+        "migrationRisk": "low"
+      },
+      {
+        "ruleId": "HAR004",
+        "hint": "Define a valid memoryPolicy with retrievalMode, maxContextItems, writebackEnabled, and piiRetention settings.",
+        "resolutionSteps": [
+          "Set memoryPolicy.retrievalMode to either 'monitor' or 'reason'.",
+          "Set memoryPolicy.maxContextItems to an integer between 1 and 200.",
+          "Explicitly configure memoryPolicy.writebackEnabled and piiRetention values.",
+          "Validate memoryPolicy against schema before deployment."
+        ],
+        "migrationRisk": "medium"
+      }
+    ]
+  },
+  "adversarial": {
+    "suggestions": [
+      {
+        "scenarioId": "prompt_injection_system_prompt_override",
+        "category": "prompt_injection",
+        "severity": "critical",
+        "attack": "An attacker crafts user input that attempts to override or bypass system-level prompts or constraints by injecting instructions that negate or replace system directives.",
+        "expectedDefense": "Strict parsing and sanitization of user inputs to detect and block instructions that attempt to override system prompts; enforce immutable system prompt constraints at runtime."
+      },
+      {
+        "scenarioId": "tool_permission_escalation_unscoped_tool_call",
+        "category": "tool_permission_escalation",
+        "severity": "critical",
+        "attack": "A workflow node calls a tool with overly broad or wildcard permissions (e.g., '*' or 'resource:*'), allowing access to unauthorized resources or actions beyond intended scope.",
+        "expectedDefense": "Enforce strict permission scoping on all tool calls; disallow wildcard or unscoped permissions; require explicit least-privilege permissions for each tool invocation."
+      },
+      {
+        "scenarioId": "cross_tenant_access_implicit_bypass",
+        "category": "cross_tenant_access",
+        "severity": "critical",
+        "attack": "Workflow objective or system prompt lacks explicit denial of cross-tenant data access, allowing implicit or indirect access to data from other tenants.",
+        "expectedDefense": "Require explicit tenant boundary language denying cross-tenant access in workflow objectives and system prompts; implement runtime tenant data isolation checks."
+      },
+      {
+        "scenarioId": "memory_poisoning_malicious_context_injection",
+        "category": "memory_poisoning",
+        "severity": "critical",
+        "attack": "An attacker injects malicious or misleading data into the workflow memory context, causing corrupted or poisoned memory state that influences future workflow decisions.",
+        "expectedDefense": "Implement strict validation and sanitization of all memory writes; use integrity checks and anomaly detection on memory context; isolate memory per tenant and workflow."
+      },
+      {
+        "scenarioId": "prompt_injection_nested_instruction_embedding",
+        "category": "prompt_injection",
+        "severity": "warning",
+        "attack": "User input embeds nested instructions or encoded commands that evade simple keyword detection and attempt to manipulate the prompt or workflow behavior.",
+        "expectedDefense": "Use advanced NLP techniques to detect nested or encoded instructions; apply multi-layered input validation and context-aware filtering."
+      },
+      {
+        "scenarioId": "tool_permission_escalation_chained_tool_calls",
+        "category": "tool_permission_escalation",
+        "severity": "warning",
+        "attack": "An attacker chains multiple tool calls in a workflow to escalate permissions indirectly, exploiting intermediate tools with broader permissions.",
+        "expectedDefense": "Analyze tool call chains for cumulative permission escalation; enforce permission checks at each step; limit chaining of tools with sensitive permissions."
+      },
+      {
+        "scenarioId": "cross_tenant_access_data_leak_via_shared_resources",
+        "category": "cross_tenant_access",
+        "severity": "warning",
+        "attack": "Data from one tenant is leaked to another tenant via shared resources or improperly isolated caches or memory segments.",
+        "expectedDefense": "Enforce strict tenant isolation on all shared resources; implement tenant-aware caching and memory segmentation; audit data flows for cross-tenant leaks."
+      },
+      {
+        "scenarioId": "memory_poisoning_pii_retention_misconfiguration",
+        "category": "memory_poisoning",
+        "severity": "warning",
+        "attack": "Misconfiguration of memory policies allows retention of personally identifiable information (PII) beyond allowed limits, risking data poisoning and privacy violations.",
+        "expectedDefense": "Validate memory policy configurations to enforce PII retention rules; audit memory writes for PII content; apply automatic redaction or expiration of sensitive data."
+      }
+    ]
+  },
   "generatedBy": "scripts/inference-check.mjs"
 }
