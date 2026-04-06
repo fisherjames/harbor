@@ -5,7 +5,7 @@ Durable workflow execution workers using Inngest, including run isolation lifecy
 
 ## Entrypoints
 - `src/inngest.ts`: event handlers and execution triggers.
-- `src/run-isolation.ts`: worktree-bound isolation lifecycle.
+- `src/run-isolation.ts`: re-export of shared worktree-bound isolation manager from `@harbor/engine`.
 - `src/index.ts`: worker bootstrap.
 
 ## Commands

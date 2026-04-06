@@ -3,6 +3,7 @@ FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
+RUN apk add --no-cache git
 RUN corepack disable
 RUN npm install --global pnpm@8.6.2
 WORKDIR /app
@@ -24,4 +25,38 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS runtime
 
 COPY . .
-RUN find . -name "*.tsbuildinfo" -delete
+RUN find . -name "*.tsbuildinfo" -delete && \
+    if [ ! -d .git ]; then \
+      git init && \
+      git config user.name "harbor-local" && \
+      git config user.email "harbor-local@local.dev" && \
+      mkdir -p .git/info && \
+      printf '%s\n' \
+        'node_modules/' \
+        '**/node_modules/' \
+        '.pnpm-store/' \
+        '.turbo/' \
+        '**/.next/' \
+        '**/dist/' \
+        '**/coverage/' \
+        '*.tsbuildinfo' \
+        > .git/info/exclude && \
+      git add -A \
+        AGENTS.md \
+        README.md \
+        package.json \
+        pnpm-lock.yaml \
+        pnpm-workspace.yaml \
+        turbo.json \
+        tsconfig.base.json \
+        tsconfig.json \
+        .env.example \
+        Dockerfile.local \
+        docker-compose.yml \
+        apps \
+        docs \
+        infra \
+        packages \
+        scripts && \
+      git commit -m "local docker snapshot"; \
+    fi

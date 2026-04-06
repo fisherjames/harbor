@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-04-06T14:25:02.362Z",
+  "generatedAt": "2026-04-06T14:52:25.554Z",
   "rubricVersion": "rubric-v1",
   "benchmarkSetId": "shared-benchmark-v1",
   "calibratedAt": "2026-04-06T00:00:00.000Z",
-  "daysSinceCalibration": 0.6007,
+  "daysSinceCalibration": 0.6197,
   "agreementScore": 1,
   "driftScore": 0,
   "minimumAgreement": 0.85,

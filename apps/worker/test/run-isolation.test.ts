@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  type RunIsolationCommandRunner,
   createWorktreeBoundRunIsolationManager,
   normalizePathSegment,
-  resolveObservabilityTtlMs
+  resolveObservabilityTtlMs,
+  resolveRunIsolationMode
 } from "../src/index.js";
 
 const DEFAULT_TTL_MS = 15 * 60 * 1000;
@@ -79,6 +81,20 @@ describe("run isolation manager", () => {
     expect(resolveObservabilityTtlMs()).toBe(120_000);
   });
 
+  it("resolves run isolation mode with sensible defaults and env overrides", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    expect(resolveRunIsolationMode()).toBe("filesystem");
+
+    vi.stubEnv("NODE_ENV", "development");
+    expect(resolveRunIsolationMode()).toBe("git-worktree");
+
+    vi.stubEnv("HARBOR_RUN_ISOLATION_MODE", "filesystem");
+    expect(resolveRunIsolationMode()).toBe("filesystem");
+
+    vi.stubEnv("HARBOR_RUN_ISOLATION_MODE", "git-worktree");
+    expect(resolveRunIsolationMode()).toBe("git-worktree");
+  });
+
   it("creates a run-scoped worktree and tears it down", async () => {
     const root = await mkdtemp(join(tmpdir(), "harbor-isolation-"));
     tempRoots.push(root);
@@ -140,6 +156,58 @@ describe("run isolation manager", () => {
 
     await manager.teardown(runContext, session, "completed");
     await expect(access(session.worktreePath)).rejects.toThrow();
+  });
+
+  it("creates and removes git worktrees in git-worktree mode", async () => {
+    const root = await mkdtemp(join(tmpdir(), "harbor-isolation-git-"));
+    tempRoots.push(root);
+
+    const commandCalls: Array<{ command: string; args: string[] }> = [];
+    const commandRunner: RunIsolationCommandRunner = async (command, args) => {
+      commandCalls.push({ command, args });
+      if (args.includes("rev-parse")) {
+        return {
+          stdout: "/repo/root\n",
+          stderr: ""
+        };
+      }
+
+      return {
+        stdout: "",
+        stderr: ""
+      };
+    };
+
+    const manager = createWorktreeBoundRunIsolationManager({
+      worktreeRoot: root,
+      mode: "git-worktree",
+      commandRunner,
+      now: () => new Date("2026-04-05T03:00:00.000Z")
+    });
+
+    const session = await manager.setup(runContext);
+
+    expect(session.metadata?.isolationMode).toBe("git-worktree");
+    expect(session.metadata?.gitRoot).toBe("/repo/root");
+    expect(
+      commandCalls.some(
+        (call) =>
+          call.command === "git" &&
+          call.args.join(" ").includes("worktree add --detach") &&
+          call.args.includes(session.worktreePath)
+      )
+    ).toBe(true);
+
+    await manager.teardown(runContext, session, "completed");
+
+    expect(
+      commandCalls.some(
+        (call) =>
+          call.command === "git" &&
+          call.args.join(" ").includes("worktree remove --force") &&
+          call.args.includes(session.worktreePath)
+      )
+    ).toBe(true);
   });
 
   it("allows idempotent teardown for already-removed worktrees", async () => {

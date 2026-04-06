@@ -22,11 +22,12 @@
 1. Install dependencies: `pnpm install`.
 2. Copy env template and configure real providers: `cp .env.example .env`.
 3. Configure Docker env: `cp .env.docker.example .env`.
-4. Optional: override host ports in `.env` if defaults are busy (for example `HARBOR_WEB_PORT=3005`).
-5. Start full local docker stack: `docker compose up --build -d`.
-6. Run all quality gates: `pnpm check`.
-7. Start development services (optional non-docker workflow): `pnpm dev`.
-8. Validate docs/vision contracts before milestone changes:
+4. Keep `HARBOR_RUN_ISOLATION_MODE=git-worktree` (default) so each run is bound to a git worktree.
+5. Optional: override host ports in `.env` if defaults are busy (for example `HARBOR_WEB_PORT=3005`).
+6. Start full local docker stack: `docker compose up --build -d`.
+7. Run all quality gates: `pnpm check`.
+8. Start development services (optional non-docker workflow): `pnpm dev`.
+9. Validate docs/vision contracts before milestone changes:
 - `pnpm vision:check`
 - `pnpm docs:check`
 - `pnpm features:check`

@@ -31,6 +31,17 @@ export {
 } from "./runtime/echo-model.js";
 export { createFileStandardsRemediationProvider } from "./runtime/standards-remediation.js";
 export {
+  createWorktreeBoundRunIsolationManager,
+  normalizePathSegment,
+  resolveObservabilityTtlMs,
+  resolveRunIsolationMode,
+  resolveGitRepositoryRoot,
+  type RunIsolationMode,
+  type WorktreeBoundRunIsolationOptions,
+  type RunIsolationCommandRunner,
+  type CommandExecutionResult
+} from "./runtime/run-isolation.js";
+export {
   DEFAULT_HARBOR_POLICY_DOCUMENT,
   DEFAULT_HARBOR_POLICY_BUNDLE,
   DEFAULT_HARBOR_POLICY_SIGNATURE,

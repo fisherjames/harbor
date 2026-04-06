@@ -294,18 +294,23 @@
       "status": "complete",
       "summary": "Each run gets an isolated worktree plus deterministic teardown.",
       "evidence": [
-        "apps/worker/src/run-isolation.ts",
+        "packages/engine/src/runtime/run-isolation.ts",
+        "apps/web/src/server/dependencies.ts",
         "apps/worker/test/run-isolation.test.ts",
         "docs/architecture/decision-records/0005-run-worktree-isolation.md"
       ],
       "assertions": [
         {
-          "path": "apps/worker/src/run-isolation.ts",
-          "pattern": "const worktreeRoot ="
+          "path": "packages/engine/src/runtime/run-isolation.ts",
+          "pattern": "\"worktree\", \"add\", \"--detach\""
         },
         {
-          "path": "apps/worker/src/run-isolation.ts",
-          "pattern": "await rm(session.worktreePath, { recursive: true, force: true })"
+          "path": "packages/engine/src/runtime/run-isolation.ts",
+          "pattern": "\"worktree\", \"remove\", \"--force\""
+        },
+        {
+          "path": "apps/web/src/server/dependencies.ts",
+          "pattern": "runIsolation"
         }
       ]
     },
@@ -316,17 +321,17 @@
       "status": "complete",
       "summary": "Each run is assigned an observability session envelope with explicit expiry metadata.",
       "evidence": [
-        "apps/worker/src/run-isolation.ts",
+        "packages/engine/src/runtime/run-isolation.ts",
         "packages/observability/src/index.ts",
         "apps/web/app/runs/[runId]/page.tsx"
       ],
       "assertions": [
         {
-          "path": "apps/worker/src/run-isolation.ts",
+          "path": "packages/engine/src/runtime/run-isolation.ts",
           "pattern": "observabilitySessionId"
         },
         {
-          "path": "apps/worker/src/run-isolation.ts",
+          "path": "packages/engine/src/runtime/run-isolation.ts",
           "pattern": "observabilityExpiresAt"
         }
       ]

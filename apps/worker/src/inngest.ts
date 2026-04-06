@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_HARBOR_POLICY_SIGNATURE,
   createModelProviderFromEnv,
+  createWorktreeBoundRunIsolationManager,
   createFileStandardsRemediationProvider,
   createWorkflowPolicyVerifier,
   createWorkflowRunner,
@@ -19,7 +20,6 @@ import {
   type RunStore
 } from "@harbor/database";
 import { runAdversarialSuite, type AdversarialTaxonomySummary, type WorkflowDefinition } from "@harbor/harness";
-import { createWorktreeBoundRunIsolationManager } from "./run-isolation.js";
 
 export interface WorkflowRunRequestedEvent {
   name: "harbor/workflow.run.requested";

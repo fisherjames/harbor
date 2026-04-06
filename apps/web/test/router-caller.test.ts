@@ -95,6 +95,7 @@ describe("web server caller", () => {
       runId: run.runId
     });
     expect(runDetail.runId).toBe(run.runId);
+    expect(runDetail.artifacts["run-isolation-session"]).toBeDefined();
 
     const escalated = await caller.escalateRun({
       runId: run.runId,

@@ -1,6 +1,7 @@
 # Local Docker Stack
 
 This guide runs Harbor as a full local stack with real model provider wiring.
+The Docker image initializes a local git snapshot so `git worktree add/remove` isolation works inside containers.
 
 ## Services
 
@@ -25,6 +26,7 @@ cp .env.docker.example .env
 - Keep `MEMU_ENDPOINT=http://memu-mock:8080` to use the included local memU-compatible mock.
 - Optional GitHub promotion provider: set `GITHUB_TOKEN` and `GITHUB_PROMOTION_REPOSITORY`.
 - Optional Clerk browser auth key: set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
+- Keep `HARBOR_RUN_ISOLATION_MODE=git-worktree` to enforce git-worktree-bound runs (default).
 
 3. Optional: override host ports when defaults are occupied:
 
@@ -53,6 +55,7 @@ docker compose logs -f web worker inngest
 - Inngest endpoint target: `http://worker:8289/api/inngest`
 
 Use the worker health payload to verify effective provider wiring (`requested` vs `effective` model provider, memU endpoint, database branch).
+Each run also records `run-isolation-session` artifacts including worktree path and isolation mode.
 
 ## Teardown
 

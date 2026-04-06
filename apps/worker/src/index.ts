@@ -16,5 +16,10 @@ export {
   createWorktreeBoundRunIsolationManager,
   resolveObservabilityTtlMs,
   normalizePathSegment,
+  resolveRunIsolationMode,
+  resolveGitRepositoryRoot,
+  type RunIsolationMode,
+  type RunIsolationCommandRunner,
+  type CommandExecutionResult,
   type WorktreeBoundRunIsolationOptions
 } from "./run-isolation.js";

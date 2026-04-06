@@ -51,6 +51,7 @@ Set providers:
 - `HARBOR_MODEL_PROVIDER=openai` + `OPENAI_API_KEY` for real model calls.
 - `HARBOR_MODEL_PROVIDER=echo` for deterministic local runs without external model APIs.
 - Keep `MEMU_ENDPOINT=http://memu-mock:8080` when using the Docker memU mock.
+- Keep `HARBOR_RUN_ISOLATION_MODE=git-worktree` so each run is bound to a git worktree (default).
 - Optional GitHub promotion provider: `GITHUB_TOKEN`, `GITHUB_PROMOTION_REPOSITORY`.
 - Optional Clerk UI key: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 

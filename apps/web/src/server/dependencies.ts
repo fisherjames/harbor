@@ -13,6 +13,7 @@ import {
 import {
   DEFAULT_HARBOR_POLICY_SIGNATURE,
   createModelProviderFromEnv,
+  createWorktreeBoundRunIsolationManager,
   createFileStandardsRemediationProvider,
   createWorkflowPolicyVerifier,
   createWorkflowRunner
@@ -168,12 +169,14 @@ export function getAppRouter(): AppRouter {
   );
   const policyVerifier = resolvePolicyVerifier();
   const evaluatorRubric = resolveEvaluatorRubric();
+  const runIsolation = createWorktreeBoundRunIsolationManager();
 
   const runner = createWorkflowRunner({
     model: createModelProviderFromEnv(),
     memu: resolveMemuClient(),
     persistence: runStore,
     tracer: createRunTracer("harbor-web"),
+    runIsolation,
     standardsRemediationProvider,
     policyVerifier
   });
